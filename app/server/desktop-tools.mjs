@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { capabilityCatalog, oviaDoctrine, planCommand } from "./ovia-core.mjs";
 import { createLedger } from "./ledger.mjs";
+import { createStateStore } from "./state-store.mjs";
 
 const execFileAsync = promisify(execFile);
 const TEXT_EXTENSIONS = new Set([
@@ -55,6 +56,13 @@ function receipt(tool, scope, result) {
     verified: true,
     result,
   };
+}
+
+// Remote and pairing records reference the All Access session that authorised
+// them. They store only a hash of that token so the state file never holds a
+// credential that could be replayed.
+function accessTokenHash(token) {
+  return token ? createHash("sha256").update(String(token)).digest("hex") : null;
 }
 
 function safeName(name, fallback = "raimosa-output") {
@@ -452,25 +460,61 @@ async function openDocument(payload) {
 }
 
 export function createDesktopToolService(options = {}) {
-  const approvals = new Map();
-  const accessSessions = new Map();
-  const remotePairings = new Map();
-  const remoteSessions = new Map();
+  const stateDir = path.resolve(process.cwd(), "local-workspace", ".raimosa");
   const ledger = createLedger(
-    options.ledgerFile ??
-      path.resolve(process.cwd(), "local-workspace", ".raimosa", "ledger.db"),
+    options.ledgerFile ?? path.join(stateDir, "ledger.db"),
+  );
+  const state = createStateStore(
+    options.stateFile ??
+      (options.ledgerFile === ":memory:"
+        ? ":memory:"
+        : path.join(stateDir, "state.db")),
   );
 
   function record(nextReceipt) {
     return ledger.append(nextReceipt);
   }
 
+  // Crash recovery. A runtime that stops takes the visible All Access
+  // countdown with it, so any authority that outlived the process is closed
+  // here and reported, never silently resumed. Approvals are left alone: they
+  // are inert plans that still require live authority to execute.
+  function recoverInterruptedAuthority() {
+    const now = Date.now();
+    state.purgeExpired(now);
+    const stranded = state.listSessions("access");
+    for (const session of stranded) {
+      record(
+        receipt("access-interrupted", "local desktop authority", {
+          sessionId: session.id,
+          state: "revoked",
+          reason:
+            "The RAIMOSA runtime stopped while this All Access session was live. Authority was ended, not resumed.",
+          wouldHaveExpiredAt: new Date(session.expiresAt).toISOString(),
+        }),
+      );
+    }
+    const remotes = state.listSessions("remote").length;
+    state.deleteAll("access");
+    state.deleteAll("remote");
+    state.deleteAll("pairing");
+    return { revokedAccessSessions: stranded.length, revokedRemotes: remotes };
+  }
+
+  const recovery = recoverInterruptedAuthority();
+
   function activeAccess(token) {
-    const session = accessSessions.get(token);
+    const session = state.getSession("access", token);
     if (!session || session.expiresAt <= Date.now()) {
-      if (token) accessSessions.delete(token);
+      if (token) state.deleteSession("access", token);
       return null;
     }
+    return session;
+  }
+
+  function liveAccessByHash(hash) {
+    const session = state.getSessionByHash("access", hash);
+    if (!session || session.expiresAt <= Date.now()) return null;
     return session;
   }
 
@@ -489,13 +533,15 @@ export function createDesktopToolService(options = {}) {
       throw new Error("Confirm a 5, 10, or 15 minute All Access session.");
     }
     const token = randomUUID();
+    // The token is the lookup key and is stored only as a hash. It must never
+    // become part of the persisted payload.
     const session = {
       id: `ACCESS-${randomUUID().slice(0, 8).toUpperCase()}`,
-      token,
       createdAt: Date.now(),
       expiresAt: Date.now() + duration * 1000,
+      durationSeconds: duration,
     };
-    accessSessions.set(token, session);
+    state.putSession("access", token, session);
     record(
       receipt("access-start", "local desktop authority", {
         sessionId: session.id,
@@ -516,13 +562,11 @@ export function createDesktopToolService(options = {}) {
 
   function endAccess(payload = {}) {
     const session = activeAccess(payload.token);
-    if (payload.token) accessSessions.delete(payload.token);
-    for (const [token, session] of remoteSessions) {
-      if (session.accessToken === payload.token) remoteSessions.delete(token);
-    }
-    for (const [code, pairing] of remotePairings) {
-      if (pairing.accessToken === payload.token) remotePairings.delete(code);
-    }
+    if (payload.token) state.deleteSession("access", payload.token);
+    const boundToThisAccess = (entry) =>
+      entry.accessTokenHash === accessTokenHash(payload.token);
+    state.deleteSessionsWhere("remote", boundToThisAccess);
+    state.deleteSessionsWhere("pairing", boundToThisAccess);
     if (session) {
       record(
         receipt("access-end", "local desktop authority", {
@@ -568,12 +612,11 @@ export function createDesktopToolService(options = {}) {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const pairing = {
       id: `PAIR-${randomUUID().slice(0, 8).toUpperCase()}`,
-      code,
-      accessToken: payload.accessToken,
+      accessTokenHash: accessTokenHash(payload.accessToken),
       createdAt: Date.now(),
       expiresAt: Math.min(access.expiresAt, Date.now() + 5 * 60 * 1000),
     };
-    remotePairings.set(code, pairing);
+    state.putSession("pairing", code, pairing);
     record(
       receipt("remote-pairing-start", "local network", {
         pairingId: pairing.id,
@@ -598,26 +641,21 @@ export function createDesktopToolService(options = {}) {
 
   function pairRemote(payload = {}) {
     const code = String(payload.code ?? "").trim();
-    const pairing = remotePairings.get(code);
-    if (
-      !pairing ||
-      pairing.expiresAt <= Date.now() ||
-      !activeAccess(pairing.accessToken)
-    ) {
-      remotePairings.delete(code);
+    const pairing = state.getSession("pairing", code);
+    const access = pairing ? liveAccessByHash(pairing.accessTokenHash) : null;
+    if (!pairing || pairing.expiresAt <= Date.now() || !access) {
+      state.deleteSession("pairing", code);
       throw new Error("The pairing code is invalid or expired.");
     }
-    remotePairings.delete(code);
+    state.deleteSession("pairing", code);
     const token = randomUUID();
-    const access = requireAccess(pairing.accessToken);
     const session = {
       id: `REMOTE-${randomUUID().slice(0, 8).toUpperCase()}`,
-      token,
-      accessToken: pairing.accessToken,
+      accessTokenHash: pairing.accessTokenHash,
       createdAt: Date.now(),
       expiresAt: access.expiresAt,
     };
-    remoteSessions.set(token, session);
+    state.putSession("remote", token, session);
     record(
       receipt("remote-paired", "local network", {
         sessionId: session.id,
@@ -641,13 +679,13 @@ export function createDesktopToolService(options = {}) {
   }
 
   function activeRemote(token) {
-    const session = remoteSessions.get(token);
+    const session = state.getSession("remote", token);
     if (
       !session ||
       session.expiresAt <= Date.now() ||
-      !activeAccess(session.accessToken)
+      !liveAccessByHash(session.accessTokenHash)
     ) {
-      if (token) remoteSessions.delete(token);
+      if (token) state.deleteSession("remote", token);
       return null;
     }
     return session;
@@ -673,7 +711,7 @@ export function createDesktopToolService(options = {}) {
 
   function endRemote(payload = {}) {
     const session = activeRemote(payload.token);
-    if (payload.token) remoteSessions.delete(payload.token);
+    if (payload.token) state.deleteSession("remote", payload.token);
     if (session) {
       record(
         receipt("remote-ended", "local network", {
@@ -777,6 +815,22 @@ export function createDesktopToolService(options = {}) {
     }
 
     checks.push({
+      id: "authority.durable-state",
+      status: state.durable ? "pass" : "fail",
+      detail: state.durable
+        ? "Approvals and authority are stored durably, and secrets are held only as hashes."
+        : "Authority state is in memory only and will not survive a restart.",
+    });
+
+    checks.push({
+      id: "authority.crash-recovery",
+      status: "pass",
+      detail: recovery.revokedAccessSessions
+        ? `${recovery.revokedAccessSessions} All Access session(s) survived a runtime stop and were revoked, not resumed.`
+        : "No All Access session outlived the previous runtime.",
+    });
+
+    checks.push({
       id: "ledger.durability",
       status: ledger.durable ? "pass" : "fail",
       detail: ledger.durable
@@ -821,7 +875,8 @@ export function createDesktopToolService(options = {}) {
     const hash = createHash("sha256")
       .update(JSON.stringify({ root, operations }))
       .digest("hex");
-    approvals.set(approvalId, {
+    state.putApproval({
+      id: approvalId,
       root,
       operations,
       hash,
@@ -839,9 +894,20 @@ export function createDesktopToolService(options = {}) {
   async function executeOrganization(payload) {
     if (payload.confirmation !== "MOVE")
       throw new Error('Type "MOVE" to confirm this exact plan.');
-    const approval = approvals.get(payload.approvalId);
+    const approval = state.getApproval(payload.approvalId);
     if (!approval || approval.expiresAt < Date.now())
       throw new Error("The approval is missing or expired. Create a new plan.");
+    if (approval.claimedAt)
+      throw new Error(
+        "This approval was already used. Create a new plan to run it again.",
+      );
+    // Take single-use ownership before the first file moves. If the runtime
+    // dies mid-execution the claim is already on disk, so the same approved
+    // plan can never be replayed into duplicate side effects.
+    if (!state.claimApproval(payload.approvalId))
+      throw new Error(
+        "This approval was already used. Create a new plan to run it again.",
+      );
     const completed = [];
     try {
       for (const operation of approval.operations) {
@@ -871,7 +937,7 @@ export function createDesktopToolService(options = {}) {
       }
       throw error;
     }
-    approvals.delete(payload.approvalId);
+    state.deleteApproval(payload.approvalId);
     return receipt("execute-organization", approval.root, {
       moved: completed.length,
       deletions: 0,
@@ -981,8 +1047,10 @@ export function createDesktopToolService(options = {}) {
     verifyLedger() {
       return ledger.verify();
     },
+    recovery,
     closeLedger() {
       ledger.close();
+      state.close();
     },
   };
 }
