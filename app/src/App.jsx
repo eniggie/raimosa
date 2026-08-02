@@ -1650,7 +1650,7 @@ function StopDialog({ stage, onReview, onClear }) {
             </p>
             <strong>
               <CheckCircle />
-              New execution blocked locally
+              Adapter dispatch latched at the local runtime
             </strong>
             <button type="button" onClick={onReview}>
               Continue to recovery review
@@ -1747,7 +1747,14 @@ export function App() {
     desktopApi
       .health()
       .then((data) => {
-        if (current) setHealth(data);
+        if (!current) return;
+        setHealth(data);
+        // The latch is server state and survives restarts; a fresh tab must
+        // show the active emergency stop instead of a falsely ready shell.
+        if (data.emergency?.latched) {
+          setStopped(true);
+          setStopStage("blocked");
+        }
       })
       .catch(() => {
         if (current) setHealth(null);
@@ -1835,7 +1842,11 @@ export function App() {
       window.clearTimeout(simulationTimerRef.current);
       simulationTimerRef.current = null;
     }
-    void endAccess(
+    // Latch the server first: this blocks every adapter dispatch and revokes
+    // all authority runtime-wide, not just in this tab.
+    void desktopApi.emergencyStop().catch(() => {});
+    setAccess({ active: false, remaining: 0, token: null, id: null });
+    setAnnouncement(
       "Emergency stop active. All Access and mobile remote sessions were revoked.",
     );
     setPlans((current) =>
@@ -2041,6 +2052,7 @@ export function App() {
           stage={stopStage}
           onReview={() => setStopStage("review")}
           onClear={() => {
+            void desktopApi.emergencyClear().catch(() => {});
             setStopped(false);
             setStopStage("blocked");
             setAnnouncement("Emergency stop cleared after recovery review.");

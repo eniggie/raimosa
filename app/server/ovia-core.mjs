@@ -229,7 +229,32 @@ export function planCommand(command, { root } = {}) {
     }))
     .filter((rule) => rule.score > 0)
     .sort((a, b) => b.score - a.score);
-  const selectedId = matches[0]?.id ?? "find-files";
+  // No keyword match means OVIA AI does not understand the request. Say so.
+  // Defaulting to some capability here would be a fail-open normalizer: the
+  // plan would claim an intent the user never expressed.
+  if (matches.length === 0) {
+    return {
+      id: `PLAN-${randomUUID().slice(0, 8).toUpperCase()}`,
+      command: text,
+      intent: "Unrecognized request",
+      capabilityId: null,
+      scope: root || "Scope required before execution",
+      risk: "none",
+      adapter: null,
+      available: false,
+      requiresApproval: false,
+      decision: "clarification-needed",
+      explanation:
+        "OVIA AI could not match this request to a verified capability. Nothing was selected and nothing will run.",
+      steps: [
+        "State what outcome you want in plain words",
+        "OVIA AI will select a verified adapter only when the intent is clear",
+        "No execution control is offered for an unrecognized request",
+      ],
+    };
+  }
+
+  const selectedId = matches[0].id;
   const capability = capabilityCatalog.find((item) => item.id === selectedId);
   const available = capability?.status === "available";
   const requiresApproval = !["read-only"].includes(capability?.risk);

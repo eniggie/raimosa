@@ -19,6 +19,9 @@ export const desktopApi = {
   scan: () => request("/scan", {}),
   plan: (command, root) => request("/plan", { command, root }),
   run: (tool, payload = {}) => request(`/tools/${tool}`, payload),
+  emergencyStop: () => request("/stop", {}),
+  emergencyClear: () => request("/stop/clear", {}),
+  emergencyStatus: () => request("/stop/status", {}),
   startAccess: (duration) =>
     request("/access/start", { duration, confirmed: true }),
   endAccess: (token) => request("/access/end", { token }),

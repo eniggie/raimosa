@@ -33,6 +33,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   PRIMARY KEY (kind, key_hash)
 );
 
+CREATE TABLE IF NOT EXISTS flags (
+  name       TEXT PRIMARY KEY,
+  payload    TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS approvals (
   id          TEXT PRIMARY KEY,
   root        TEXT NOT NULL,
@@ -70,9 +76,13 @@ export function createStateStore(file) {
   const deleteSession = db.prepare(
     "DELETE FROM sessions WHERE kind = ? AND key_hash = ?",
   );
-  const listSessionsOfKind = db.prepare("SELECT * FROM sessions WHERE kind = ?");
+  const listSessionsOfKind = db.prepare(
+    "SELECT * FROM sessions WHERE kind = ?",
+  );
   const deleteKind = db.prepare("DELETE FROM sessions WHERE kind = ?");
-  const deleteExpired = db.prepare("DELETE FROM sessions WHERE expires_at <= ?");
+  const deleteExpired = db.prepare(
+    "DELETE FROM sessions WHERE expires_at <= ?",
+  );
 
   const putApproval = db.prepare(
     `INSERT OR REPLACE INTO approvals (id, root, operations, hash, expires_at, claimed_at)
@@ -217,6 +227,27 @@ export function createStateStore(file) {
 
     deleteApproval(id) {
       dropApproval.run(String(id ?? ""));
+    },
+
+    /**
+     * Durable named flags (e.g. the emergency-stop latch). A flag has no
+     * expiry: it stays set across restarts until explicitly cleared.
+     */
+    setFlag(name, payload = {}) {
+      db.prepare(
+        "INSERT OR REPLACE INTO flags (name, payload, created_at) VALUES (?, ?, ?)",
+      ).run(String(name), JSON.stringify(payload), Date.now());
+    },
+
+    getFlag(name) {
+      const row = db
+        .prepare("SELECT payload, created_at FROM flags WHERE name = ?")
+        .get(String(name));
+      return row ? { ...JSON.parse(row.payload), setAt: row.created_at } : null;
+    },
+
+    clearFlag(name) {
+      db.prepare("DELETE FROM flags WHERE name = ?").run(String(name));
     },
 
     close() {

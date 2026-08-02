@@ -68,19 +68,38 @@ export function raimosaLocalTools() {
             return;
           }
           const origin = req.headers.origin;
-          if (
-            !remoteRoute &&
-            origin &&
-            !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)
-          ) {
-            send(res, 403, {
-              ok: false,
-              error: "Cross-origin desktop adapter requests are blocked.",
-            });
-            return;
+          if (origin) {
+            // Desktop routes accept only localhost origins. Remote routes may
+            // also be called from the RAIMOSA page served on a private LAN
+            // address — but never from a public web origin, which blocks
+            // drive-by browser pages from reaching the pairing endpoint.
+            const host = (() => {
+              try {
+                return new URL(origin).hostname;
+              } catch {
+                return "";
+              }
+            })();
+            const localhostOrigin = /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(
+              host,
+            );
+            const allowed = remoteRoute
+              ? localhostOrigin || isLocalNetwork(host)
+              : localhostOrigin;
+            if (!allowed) {
+              send(res, 403, {
+                ok: false,
+                error: "Cross-origin adapter requests are blocked.",
+              });
+              return;
+            }
           }
+          const serverPort =
+            server.config.server.port ??
+            server.httpServer?.address()?.port ??
+            4173;
           if (req.method === "GET" && route === "/health") {
-            send(res, 200, service.health());
+            send(res, 200, service.health({ port: serverPort }));
             return;
           }
           if (req.method === "GET" && route === "/receipts") {
@@ -104,6 +123,18 @@ export function raimosaLocalTools() {
             send(res, 200, { ok: true, receipt: scanReceipt });
             return;
           }
+          if (route === "/stop") {
+            send(res, 200, service.emergencyStop());
+            return;
+          }
+          if (route === "/stop/clear") {
+            send(res, 200, service.emergencyClear());
+            return;
+          }
+          if (route === "/stop/status") {
+            send(res, 200, service.emergencyStatus());
+            return;
+          }
           if (route === "/access/start") {
             send(res, 200, service.startAccess(payload));
             return;
@@ -120,10 +151,7 @@ export function raimosaLocalTools() {
             send(
               res,
               200,
-              service.startRemotePairing({
-                ...payload,
-                port: server.config.server.port ?? 4173,
-              }),
+              service.startRemotePairing({ ...payload, port: serverPort }),
             );
             return;
           }

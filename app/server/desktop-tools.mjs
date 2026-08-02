@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -62,7 +62,9 @@ function receipt(tool, scope, result) {
 // them. They store only a hash of that token so the state file never holds a
 // credential that could be replayed.
 function accessTokenHash(token) {
-  return token ? createHash("sha256").update(String(token)).digest("hex") : null;
+  return token
+    ? createHash("sha256").update(String(token)).digest("hex")
+    : null;
 }
 
 function safeName(name, fallback = "raimosa-output") {
@@ -88,6 +90,18 @@ async function approvedRoot(input) {
     );
   }
   const real = await fs.realpath(resolved);
+  // Hidden directories (.ssh, .aws, .gnupg, …) hold credentials and private
+  // state. walk() already refuses to descend into them; refuse to approve one
+  // as a root too, so no adapter surface can be pointed at them.
+  const relativeToHome = path.relative(home, real);
+  const segments = (
+    relativeToHome.startsWith("..") ? real : relativeToHome
+  ).split(path.sep);
+  if (segments.some((segment) => segment.startsWith("."))) {
+    throw new Error(
+      "Hidden folders hold private system state and cannot be approved.",
+    );
+  }
   const stat = await fs.stat(real);
   if (!stat.isDirectory())
     throw new Error("The approved path must be a folder.");
@@ -503,6 +517,59 @@ export function createDesktopToolService(options = {}) {
 
   const recovery = recoverInterruptedAuthority();
 
+  // Emergency stop is a durable server-side latch, not a UI state. While
+  // latched, every adapter dispatch, All Access grant, and pairing action is
+  // refused at the server, and the latch survives a runtime restart until the
+  // owner explicitly clears it.
+  function emergencyStatus() {
+    const latch = state.getFlag("emergency-stop");
+    return {
+      ok: true,
+      latched: Boolean(latch),
+      since: latch ? new Date(latch.setAt).toISOString() : null,
+    };
+  }
+
+  function requireNotLatched() {
+    if (state.getFlag("emergency-stop"))
+      throw new Error(
+        "Emergency stop is active. Clear it from the desktop before running anything.",
+      );
+  }
+
+  function emergencyStop() {
+    const accessSessions = state.listSessions("access");
+    const remoteCount = state.listSessions("remote").length;
+    state.deleteAll("access");
+    state.deleteAll("remote");
+    state.deleteAll("pairing");
+    state.setFlag("emergency-stop", { reason: "owner-request" });
+    record(
+      receipt("emergency-stop", "local desktop authority", {
+        state: "latched",
+        revokedAccessSessions: accessSessions.map((session) => session.id),
+        revokedRemoteSessions: remoteCount,
+        detail:
+          "All adapter dispatch is blocked at the server until the latch is cleared.",
+      }),
+    );
+    return { ok: true, ...emergencyStatus() };
+  }
+
+  function emergencyClear() {
+    const latch = state.getFlag("emergency-stop");
+    if (latch) {
+      state.clearFlag("emergency-stop");
+      record(
+        receipt("emergency-clear", "local desktop authority", {
+          state: "cleared",
+          latchedSince: new Date(latch.setAt).toISOString(),
+        }),
+      );
+    }
+    return { ok: true, ...emergencyStatus() };
+  }
+
   function activeAccess(token) {
     const session = state.getSession("access", token);
     if (!session || session.expiresAt <= Date.now()) {
@@ -528,6 +595,7 @@ export function createDesktopToolService(options = {}) {
   }
 
   function startAccess(payload = {}) {
+    requireNotLatched();
     const duration = Number(payload.duration);
     if (!ACCESS_DURATIONS.has(duration) || payload.confirmed !== true) {
       throw new Error("Confirm a 5, 10, or 15 minute All Access session.");
@@ -607,9 +675,17 @@ export function createDesktopToolService(options = {}) {
     return [...new Set(urls)];
   }
 
+  // A six-digit code on an open LAN endpoint is brute-forceable without an
+  // attempt limit. After MAX_PAIR_ATTEMPTS failures every outstanding code is
+  // revoked and a new one must be generated from the desktop.
+  const MAX_PAIR_ATTEMPTS = 5;
+  let failedPairAttempts = 0;
+
   function startRemotePairing(payload = {}) {
+    requireNotLatched();
     const access = requireAccess(payload.accessToken);
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    failedPairAttempts = 0;
+    const code = String(randomInt(100000, 1000000));
     const pairing = {
       id: `PAIR-${randomUUID().slice(0, 8).toUpperCase()}`,
       accessTokenHash: accessTokenHash(payload.accessToken),
@@ -640,13 +716,28 @@ export function createDesktopToolService(options = {}) {
   }
 
   function pairRemote(payload = {}) {
+    requireNotLatched();
     const code = String(payload.code ?? "").trim();
     const pairing = state.getSession("pairing", code);
     const access = pairing ? liveAccessByHash(pairing.accessTokenHash) : null;
     if (!pairing || pairing.expiresAt <= Date.now() || !access) {
       state.deleteSession("pairing", code);
+      failedPairAttempts += 1;
+      if (failedPairAttempts >= MAX_PAIR_ATTEMPTS) {
+        state.deleteAll("pairing");
+        record(
+          receipt("remote-pairing-lockout", "local network", {
+            failedAttempts: failedPairAttempts,
+            state: "all-pairing-codes-revoked",
+            detail:
+              "Too many failed pairing attempts. Generate a fresh code from the desktop.",
+          }),
+        );
+        failedPairAttempts = 0;
+      }
       throw new Error("The pairing code is invalid or expired.");
     }
+    failedPairAttempts = 0;
     state.deleteSession("pairing", code);
     const token = randomUUID();
     const session = {
@@ -814,6 +905,24 @@ export function createDesktopToolService(options = {}) {
       });
     }
 
+    const latch = emergencyStatus();
+    checks.push({
+      id: "authority.emergency-latch",
+      status: latch.latched ? "fail" : "pass",
+      detail: latch.latched
+        ? `Emergency stop has been latched since ${latch.since}; all adapter dispatch is blocked.`
+        : "Emergency stop is a durable server-side latch and is currently clear.",
+    });
+    if (latch.latched) {
+      findings.push({
+        id: "emergency-stop-latched",
+        severity: "high",
+        title: "Emergency stop is active",
+        detail:
+          "Execution is blocked at the server until the owner clears the latch.",
+      });
+    }
+
     checks.push({
       id: "authority.durable-state",
       status: state.durable ? "pass" : "fail",
@@ -950,6 +1059,7 @@ export function createDesktopToolService(options = {}) {
   }
 
   async function handle(tool, payload = {}, context = {}) {
+    requireNotLatched();
     const effectivePayload = { ...payload };
     if (context.remoteToken) {
       const remote = activeRemote(context.remoteToken);
@@ -957,9 +1067,16 @@ export function createDesktopToolService(options = {}) {
         throw new Error("The mobile remote session is expired or revoked.");
       if (!REMOTE_TOOLS.has(tool))
         throw new Error("This tool is not available from the mobile remote.");
-      effectivePayload.accessToken = remote.accessToken;
+      // The remote record holds only a hash of the desktop access token, so
+      // control tools are authorised by resolving the live access session
+      // through that hash — the raw token never travels to or from the phone.
+      if (CONTROL_TOOLS.has(tool) && !liveAccessByHash(remote.accessTokenHash))
+        throw new Error(
+          "A live OVIA AI All Access session is required for this control.",
+        );
+    } else if (CONTROL_TOOLS.has(tool)) {
+      requireAccess(effectivePayload.accessToken);
     }
-    if (CONTROL_TOOLS.has(tool)) requireAccess(effectivePayload.accessToken);
     let result;
     switch (tool) {
       case "find-files":
@@ -1008,7 +1125,7 @@ export function createDesktopToolService(options = {}) {
   }
 
   return {
-    health() {
+    health({ port } = {}) {
       return {
         ok: true,
         runtime: "local-node-adapter",
@@ -1017,13 +1134,17 @@ export function createDesktopToolService(options = {}) {
         defaultWorkspace: path.resolve(process.cwd(), "local-workspace"),
         capabilities: capabilityCatalog,
         doctrine: oviaDoctrine(),
+        emergency: emergencyStatus(),
         remote: {
           available: true,
           mode: "paired-local-network",
-          urls: networkUrls(),
+          urls: networkUrls(port),
         },
       };
     },
+    emergencyStop,
+    emergencyClear,
+    emergencyStatus,
     plan: planCommand,
     handle,
     startAccess,
