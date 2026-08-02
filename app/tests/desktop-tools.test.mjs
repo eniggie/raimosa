@@ -17,7 +17,7 @@ async function fixture(t) {
 }
 
 test("read-only tools inspect only an approved specific folder", async (t) => {
-  const service = createDesktopToolService();
+  const service = createDesktopToolService({ ledgerFile: ":memory:" });
   const root = await fixture(t);
   const found = await service.handle("find-files", { root, query: "launch" });
   assert.equal(found.verified, true);
@@ -33,7 +33,7 @@ test("read-only tools inspect only an approved specific folder", async (t) => {
 });
 
 test("write tools require live All Access and never overwrite", async (t) => {
-  const service = createDesktopToolService();
+  const service = createDesktopToolService({ ledgerFile: ":memory:" });
   const root = await fixture(t);
   await assert.rejects(
     service.handle("create-work-product", {
@@ -75,7 +75,7 @@ test("write tools require live All Access and never overwrite", async (t) => {
 });
 
 test("file organization is exact, approval-bound, reversible in design, and deletion-free", async (t) => {
-  const service = createDesktopToolService();
+  const service = createDesktopToolService({ ledgerFile: ":memory:" });
   const root = await fixture(t);
   const plan = await service.handle("plan-organization", { root });
   assert.equal(plan.result.deletions, 0);
@@ -118,7 +118,7 @@ test("file organization is exact, approval-bound, reversible in design, and dele
 });
 
 test("mobile remote pairing inherits only the active revocable desktop session", async (t) => {
-  const service = createDesktopToolService();
+  const service = createDesktopToolService({ ledgerFile: ":memory:" });
   const root = await fixture(t);
   const access = service.startAccess({
     duration: 300,
@@ -150,7 +150,7 @@ test("mobile remote pairing inherits only the active revocable desktop session",
 });
 
 test("folder snapshots detect evidence changes", async (t) => {
-  const service = createDesktopToolService();
+  const service = createDesktopToolService({ ledgerFile: ":memory:" });
   const root = await fixture(t);
   const first = await service.handle("folder-snapshot", { root });
   await fs.writeFile(path.join(root, "new.md"), "new evidence");
@@ -160,7 +160,7 @@ test("folder snapshots detect evidence changes", async (t) => {
 });
 
 test("live health scans and every adapter call appear in the runtime ledger", async (t) => {
-  const service = createDesktopToolService();
+  const service = createDesktopToolService({ ledgerFile: ":memory:" });
   const root = await fixture(t);
 
   const scan = await service.scanRuntime();
@@ -179,7 +179,7 @@ test("live health scans and every adapter call appear in the runtime ledger", as
 });
 
 test("authority receipts are logged without access or pairing secrets", () => {
-  const service = createDesktopToolService();
+  const service = createDesktopToolService({ ledgerFile: ":memory:" });
   const access = service.startAccess({
     duration: 300,
     confirmed: true,
@@ -201,7 +201,7 @@ test("authority receipts are logged without access or pairing secrets", () => {
 });
 
 test("agent runtime monitoring is read-only and does not expose private agent state", async () => {
-  const service = createDesktopToolService();
+  const service = createDesktopToolService({ ledgerFile: ":memory:" });
   const result = await service.handle("agent-runtime-monitor");
   assert.equal(result.tool, "agent-runtime-monitor");
   assert.equal(result.verified, true);

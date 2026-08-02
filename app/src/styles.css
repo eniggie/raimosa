@@ -1296,6 +1296,7 @@ main {
 
 .page-heading {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
   gap: 24px;
@@ -3037,6 +3038,7 @@ body:has(.remote-shell) {
 
 .ledger-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
@@ -3064,6 +3066,16 @@ body:has(.remote-shell) {
   color: #c9eada;
   background: rgba(35, 119, 79, 0.1);
   font-size: 12px;
+}
+
+.runtime-ledger-note.ledger-note-broken {
+  border-color: rgba(226, 106, 106, 0.45);
+  color: #f4c9c9;
+  background: rgba(140, 40, 40, 0.16);
+}
+
+.runtime-ledger-note.ledger-note-broken svg {
+  color: #e26a6a;
 }
 
 .runtime-ledger-note svg,

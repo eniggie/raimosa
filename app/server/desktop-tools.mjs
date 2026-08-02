@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { capabilityCatalog, oviaDoctrine, planCommand } from "./ovia-core.mjs";
+import { createLedger } from "./ledger.mjs";
 
 const execFileAsync = promisify(execFile);
 const TEXT_EXTENSIONS = new Set([
@@ -450,17 +451,18 @@ async function openDocument(payload) {
   });
 }
 
-export function createDesktopToolService() {
+export function createDesktopToolService(options = {}) {
   const approvals = new Map();
   const accessSessions = new Map();
   const remotePairings = new Map();
   const remoteSessions = new Map();
-  const receipts = [];
+  const ledger = createLedger(
+    options.ledgerFile ??
+      path.resolve(process.cwd(), "local-workspace", ".raimosa", "ledger.db"),
+  );
 
   function record(nextReceipt) {
-    receipts.unshift(nextReceipt);
-    if (receipts.length > 100) receipts.length = 100;
-    return nextReceipt;
+    return ledger.append(nextReceipt);
   }
 
   function activeAccess(token) {
@@ -757,6 +759,39 @@ export function createDesktopToolService() {
         "All Access and mobile remote sessions are server-expiring and revocable.",
     });
 
+    const integrity = ledger.verify();
+    checks.push({
+      id: "ledger.integrity",
+      status: integrity.intact ? "pass" : "fail",
+      detail: integrity.intact
+        ? `${integrity.checked} receipts verified against an unbroken hash chain.`
+        : `Receipt chain broken at ${integrity.brokenAt}: ${integrity.reason}`,
+    });
+    if (!integrity.intact) {
+      findings.push({
+        id: "ledger-chain-broken",
+        severity: "high",
+        title: "Receipt ledger integrity check failed",
+        detail: `${integrity.brokenAt} — ${integrity.reason}`,
+      });
+    }
+
+    checks.push({
+      id: "ledger.durability",
+      status: ledger.durable ? "pass" : "fail",
+      detail: ledger.durable
+        ? "Receipts are written to an append-only on-disk ledger and survive restart."
+        : "Receipts are held in a non-durable in-memory ledger.",
+    });
+    if (!ledger.durable) {
+      findings.push({
+        id: "ledger-not-durable",
+        severity: "medium",
+        title: "Receipt ledger is not durable",
+        detail: "Receipts will be lost when this runtime stops.",
+      });
+    }
+
     return record(
       receipt("raimosa-health-scan", "local RAIMOSA runtime", {
         status: findings.length ? "attention" : "healthy",
@@ -934,12 +969,20 @@ export function createDesktopToolService() {
     endRemote,
     scanRuntime,
     listReceipts(limit = 50) {
-      const bounded = Math.max(1, Math.min(100, Number(limit) || 50));
+      const integrity = ledger.verify();
       return {
         ok: true,
-        receipts: receipts.slice(0, bounded),
-        count: receipts.length,
+        receipts: ledger.list(limit),
+        count: ledger.count(),
+        durable: ledger.durable,
+        integrity,
       };
+    },
+    verifyLedger() {
+      return ledger.verify();
+    },
+    closeLedger() {
+      ledger.close();
     },
   };
 }

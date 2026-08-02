@@ -30,6 +30,8 @@ When implementing from a selected generated mock, treat that image as the source
 - Keep the Emergency stop visible across the desktop shell.
 - Global commands must populate the visible OVIA AI Core compiler and return the real compiled plan; acknowledgements must not imply a plan was created when no adapter call ran.
 - OVIA AI Scan & Debug must call the live read-only runtime scan. Sample findings must never masquerade as current diagnostic evidence.
-- Adapter, All Access, and paired-remote events are recorded in a bounded session-local runtime ledger. The UI must state that preview receipts reset when the local development runtime restarts.
+- Adapter, All Access, and paired-remote events are recorded in a durable append-only SQLite receipt ledger (`server/ledger.mjs`, stored at `local-workspace/.raimosa/ledger.db`). Receipts survive a runtime restart.
+- Every receipt is hash-chained to its predecessor, and UPDATE/DELETE are rejected by database triggers. The ledger is evidence, not a log: never add a code path that rewrites, prunes, or reorders it.
+- The Ledger UI must report durability and chain integrity from the live API, never as static copy. A broken chain must be shown as a failure and must fail the health scan, never be softened or hidden.
 - RAIMOSA AI must never claim an action, agent dispatch, or repair ran without a verified adapter receipt. Every detected issue and failed check must be surfaced; findings cannot be silently skipped.
 - Local AI agent discovery is read-only process and executable metadata. Commanding Codex, Claude, Grok, Gemini, or another agent requires a named, authenticated, revocable provider adapter and must never inherit credentials or authority.

@@ -709,6 +709,9 @@ function SettingsView({ settings, onChange }) {
 
 function RuntimeLedgerView({ onOpenSample }) {
   const [receipts, setReceipts] = useState([]);
+  const [durable, setDurable] = useState(false);
+  const [integrity, setIntegrity] = useState(null);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -718,6 +721,9 @@ function RuntimeLedgerView({ onOpenSample }) {
     try {
       const data = await desktopApi.receipts();
       setReceipts(data.receipts ?? []);
+      setDurable(data.durable === true);
+      setIntegrity(data.integrity ?? null);
+      setTotal(Number(data.count) || 0);
     } catch (ledgerError) {
       setError(ledgerError.message);
     } finally {
@@ -734,7 +740,10 @@ function RuntimeLedgerView({ onOpenSample }) {
       <div className="prototype-notice core-live" role="status">
         <Activity size={15} />
         <strong>Live runtime evidence</strong>
-        <span>Session-local · bounded to the latest 100 receipts</span>
+        <span>
+          {durable ? "Durable append-only ledger" : "Non-durable ledger"} ·{" "}
+          {total} recorded · showing the latest {receipts.length}
+        </span>
       </div>
       <PageHeading
         eyebrow="LEDGER"
@@ -757,12 +766,31 @@ function RuntimeLedgerView({ onOpenSample }) {
           </div>
         }
       />
-      <div className="runtime-ledger-note" role="note">
+      <div
+        className={`runtime-ledger-note${
+          integrity && !integrity.intact ? " ledger-note-broken" : ""
+        }`}
+        role={integrity && !integrity.intact ? "alert" : "note"}
+      >
         <ShieldCheck size={19} />
-        <span>
-          This preview keeps receipts in local server memory. They persist
-          across navigation and reset when the development runtime restarts.
-        </span>
+        {integrity && !integrity.intact ? (
+          <span>
+            Receipt chain integrity check FAILED at {integrity.brokenAt}.{" "}
+            {integrity.reason} Treat every receipt after that point as
+            unverified.
+          </span>
+        ) : durable ? (
+          <span>
+            Receipts are written to an append-only on-disk ledger and survive a
+            runtime restart. Each receipt is hash-chained to the one before it
+            {integrity ? `; all ${integrity.checked} verified` : ""}.
+          </span>
+        ) : (
+          <span>
+            This runtime is using a non-durable in-memory ledger. Receipts will
+            be lost when it stops.
+          </span>
+        )}
       </div>
       {error && (
         <div className="inline-error" role="alert">
