@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="RAIMOSA is initializing">
+  <style>
+    .outer{transform-origin:128px 128px;animation:spin 3.6s linear infinite}.inner{transform-origin:128px 128px;animation:reverse 2.8s linear infinite}.emblem{transform-origin:128px 128px;animation:breathe 1.8s ease-in-out infinite}@keyframes spin{to{transform:rotate(360deg)}}@keyframes reverse{to{transform:rotate(-360deg)}}@keyframes breathe{50%{opacity:.72;transform:scale(.96)}}@media(prefers-reduced-motion:reduce){.outer,.inner,.emblem{animation:none}}
+  </style>
+  <circle class="outer" cx="128" cy="128" r="116" fill="none" stroke="#6D28D9" stroke-width="3" stroke-linecap="round" stroke-dasharray="54 22 7 22"/>
+  <circle class="inner" cx="128" cy="128" r="104" fill="none" stroke="#D6A843" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 18"/>
+  <image class="emblem" href="../logo/raimosa-r-capabilities-transparent-tight.png" x="26" y="26" width="204" height="204" preserveAspectRatio="xMidYMid meet"/>
+</svg>

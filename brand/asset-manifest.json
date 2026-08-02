@@ -1,0 +1,30 @@
+{
+  "brand": "RAIMOSA AI",
+  "tagline": "Command Your World With Intelligence",
+  "approvedMaster": "logo/raimosa-r-capabilities-transparent.png",
+  "logo": {
+    "transparent": "logo/raimosa-r-capabilities-transparent.png",
+    "transparentTight": "logo/raimosa-r-capabilities-transparent-tight.png",
+    "horizontal": "logo/raimosa-logo-horizontal.png",
+    "stacked": "logo/raimosa-logo-stacked.png"
+  },
+  "desktop": {
+    "macOS": "icons/macos/RAIMOSA.icns",
+    "windows": "icons/windows/RAIMOSA.ico",
+    "linux": "icons/linux/raimosa-512x512.png"
+  },
+  "web": {
+    "favicon": "favicon/favicon.ico",
+    "favicon16": "favicon/favicon-16.png",
+    "favicon32": "favicon/favicon-32.png",
+    "appleTouch": "favicon/apple-touch-icon.png",
+    "manifest": "favicon/site.webmanifest"
+  },
+  "motion": {
+    "splash": "splash/index.html",
+    "staticFallback": "splash/assets/raimosa-splash-static-1920x1080.png",
+    "loader": "icons/raimosa-loader.svg",
+    "readyEvent": "raimosa:splash-ready",
+    "durationMs": 4800
+  }
+}

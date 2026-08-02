@@ -1,0 +1,21 @@
+:root {
+  color-scheme: dark;
+  --raimosa-royal-black: #07030d;
+  --raimosa-obsidian-purple: #17082e;
+  --raimosa-royal-purple: #6d28d9;
+  --raimosa-imperial-violet: #8b5cf6;
+  --raimosa-electric-lavender: #a78bfa;
+  --raimosa-royal-gold: #d6a843;
+  --raimosa-gold-light: #f6d782;
+  --raimosa-divine-ivory: #f8f3e7;
+  --raimosa-muted-ivory: #c7bead;
+  --raimosa-font-display: "Avenir Next", Avenir, Montserrat, Inter, sans-serif;
+  --raimosa-font-interface: Inter, "SF Pro Text", "Segoe UI", sans-serif;
+  --raimosa-radius-sm: 10px;
+  --raimosa-radius-md: 18px;
+  --raimosa-radius-lg: 28px;
+  --raimosa-shadow-command: 0 24px 80px rgb(76 29 149 / 30%);
+  --raimosa-motion-fast: 180ms;
+  --raimosa-motion-standard: 320ms;
+  --raimosa-motion-reveal: 720ms;
+}

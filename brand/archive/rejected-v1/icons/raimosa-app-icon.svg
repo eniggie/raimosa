@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">RAIMOSA application icon</title>
+  <desc id="desc">The RAIMOSA Command Sigil on a royal-black command field.</desc>
+  <defs>
+    <radialGradient id="field" cx="50%" cy="42%" r="70%">
+      <stop offset="0" stop-color="#251047"/>
+      <stop offset=".48" stop-color="#10051F"/>
+      <stop offset="1" stop-color="#07030D"/>
+    </radialGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A78BFA"/>
+      <stop offset=".52" stop-color="#6D28D9"/>
+      <stop offset="1" stop-color="#4C1D95"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F6D782"/>
+      <stop offset=".5" stop-color="#D6A843"/>
+      <stop offset="1" stop-color="#9E7421"/>
+    </linearGradient>
+    <filter id="violet-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="17" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <mask id="spear-cutout">
+      <rect width="1024" height="1024" fill="white"/>
+      <path d="M512 204 536 390 520 682 512 794 504 682 488 390Z" fill="black"/>
+    </mask>
+    <clipPath id="tile"><rect x="32" y="32" width="960" height="960" rx="220"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="32" y="32" width="960" height="960" rx="220" fill="url(#field)"/>
+    <circle cx="512" cy="480" r="352" fill="none" stroke="#6D28D9" stroke-width="2" opacity=".26"/>
+    <circle cx="512" cy="480" r="286" fill="none" stroke="#D6A843" stroke-width="2" stroke-dasharray="5 24" opacity=".34"/>
+    <circle cx="512" cy="480" r="220" fill="#6D28D9" opacity=".08" filter="url(#violet-glow)"/>
+    <path d="M512 132 578 398 548 692 512 888 476 692 446 398Z" fill="url(#violet)" mask="url(#spear-cutout)"/>
+    <path d="M548 384h100c103 0 170 62 170 155 0 77-44 133-113 153l130 180H723L586 681v-92h61c43 0 69-18 69-51 0-34-27-53-71-53h-79Z" fill="url(#violet)"/>
+    <path d="M512 326 540 446 670 472 540 498 512 620 484 498 354 472 484 446Z" fill="url(#gold)"/>
+    <path d="M512 406 525 458 582 472 525 486 512 540 499 486 442 472 499 458Z" fill="#F8F3E7"/>
+    <circle cx="512" cy="472" r="10" fill="#FFFDF8" filter="url(#violet-glow)"/>
+  </g>
+  <rect x="42" y="42" width="940" height="940" rx="210" fill="none" stroke="#D6A843" stroke-width="4" opacity=".5"/>
+</svg>

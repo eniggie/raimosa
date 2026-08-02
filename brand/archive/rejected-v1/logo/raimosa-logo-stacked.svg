@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1120" role="img" aria-labelledby="title desc">
+  <title id="title">RAIMOSA AI stacked logo</title>
+  <desc id="desc">Stacked RAIMOSA AI logo with its Command Sigil and tagline.</desc>
+  <defs>
+    <mask id="spear-cutout">
+      <rect width="1024" height="1024" fill="white"/>
+      <path d="M512 204 536 390 520 682 512 794 504 682 488 390Z" fill="black"/>
+    </mask>
+  </defs>
+  <g transform="translate(180 12) scale(.625)">
+    <path d="M512 76 578 368 548 692 512 932 476 692 446 368Z" fill="#6D28D9" mask="url(#spear-cutout)"/>
+    <path d="M548 354h108c108 0 179 66 179 164 0 81-47 141-120 163l141 195H735L586 672v-99h65c46 0 74-20 74-55 0-37-29-57-77-57h-82Z" fill="#6D28D9"/>
+    <path d="M512 302 540 432 682 460 540 488 512 620 484 488 342 460 484 432Z" fill="#D6A843"/>
+    <path d="M512 390 526 446 588 460 526 474 512 532 498 474 436 460 498 446Z" fill="#F8F3E7"/>
+  </g>
+  <g font-family="Avenir Next, Avenir, Montserrat, Inter, sans-serif" text-anchor="middle">
+    <text x="500" y="820" fill="#F8F3E7" font-size="118" font-weight="600" letter-spacing="18">RAIMOSA</text>
+    <text x="500" y="886" fill="#D6A843" font-size="35" font-weight="700" letter-spacing="12">AI</text>
+    <path d="M170 930h660" stroke="#6D28D9" stroke-width="3"/>
+    <text x="500" y="1008" fill="#D6A843" font-size="25" font-weight="500" letter-spacing="7">COMMAND YOUR WORLD</text>
+    <text x="500" y="1047" fill="#D6A843" font-size="25" font-weight="500" letter-spacing="7">WITH INTELLIGENCE</text>
+  </g>
+</svg>

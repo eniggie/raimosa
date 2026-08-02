@@ -1,0 +1,2 @@
+RAIMOSA local adapter verification notes.
+Use this file to test filename and bounded text search.
