@@ -82,7 +82,9 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
     "RAIMOSA desktop adapters are online.",
   );
   const [documentPath, setDocumentPath] = useState("README.md");
+  const [previewPath, setPreviewPath] = useState("README.md");
   const [previousSnapshot, setPreviousSnapshot] = useState(null);
+  const [vitals, setVitals] = useState(null);
 
   useEffect(() => {
     let current = true;
@@ -246,6 +248,123 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
               >
                 <Folder />
                 Summarize folder
+              </ActionButton>
+            </div>
+          </ToolSection>
+
+          <ToolSection
+            icon={Activity}
+            eyebrow="READ-ONLY"
+            title="Device vitals"
+            description="CPU load, memory pressure, disk headroom, uptime, and battery — read directly from this device."
+          >
+            <div className="tool-actions">
+              <ActionButton
+                busy={busy}
+                onClick={() =>
+                  run("device-vitals", {}, (nextReceipt) =>
+                    setVitals(nextReceipt.result),
+                  )
+                }
+              >
+                <Activity />
+                Read vitals now
+              </ActionButton>
+            </div>
+            {vitals && (
+              <div className="vitals-grid">
+                <article>
+                  <span>CPU LOAD (1m)</span>
+                  <strong>{vitals.cpu.loadAverage[0]}</strong>
+                  <small>
+                    {vitals.cpu.cores} cores · {vitals.cpu.model}
+                  </small>
+                </article>
+                <article>
+                  <span>MEMORY USED</span>
+                  <strong>{vitals.memory.usedPercent}%</strong>
+                  <small>
+                    of {(vitals.memory.totalBytes / 1024 ** 3).toFixed(0)} GB
+                  </small>
+                </article>
+                {vitals.disk && (
+                  <article>
+                    <span>DISK FREE</span>
+                    <strong>
+                      {(vitals.disk.availableBytes / 1024 ** 3).toFixed(0)} GB
+                    </strong>
+                    <small>
+                      of {(vitals.disk.totalBytes / 1024 ** 3).toFixed(0)} GB
+                    </small>
+                  </article>
+                )}
+                {vitals.battery && (
+                  <article>
+                    <span>BATTERY</span>
+                    <strong>{vitals.battery.percent}%</strong>
+                    <small>{vitals.battery.state}</small>
+                  </article>
+                )}
+                <article>
+                  <span>UPTIME</span>
+                  <strong>
+                    {Math.floor(vitals.uptimeSeconds / 3600)}h{" "}
+                    {Math.floor((vitals.uptimeSeconds % 3600) / 60)}m
+                  </strong>
+                  <small>{vitals.hostname}</small>
+                </article>
+              </div>
+            )}
+          </ToolSection>
+
+          <ToolSection
+            icon={MagnifyingGlass}
+            eyebrow="READ-ONLY"
+            title="Storage insights and duplicates"
+            description="Largest files, bytes by category, and exact content-hash duplicates inside the approved folder. Detection only — removal needs an approved plan."
+          >
+            <div className="tool-actions">
+              <ActionButton
+                busy={busy}
+                onClick={() => runRootTool("storage-insights")}
+              >
+                <Folder />
+                Analyze storage
+              </ActionButton>
+              <ActionButton
+                busy={busy}
+                onClick={() => runRootTool("find-duplicates")}
+              >
+                <MagnifyingGlass />
+                Find duplicates
+              </ActionButton>
+            </div>
+          </ToolSection>
+
+          <ToolSection
+            icon={NotePencil}
+            eyebrow="READ-ONLY"
+            title="Preview a document"
+            description="Read a bounded text preview of one exact file without opening an application."
+          >
+            <label className="tool-field">
+              File path inside approved folder
+              <input
+                value={previewPath}
+                onChange={(event) => setPreviewPath(event.target.value)}
+                placeholder="README.md"
+              />
+            </label>
+            <div className="tool-actions">
+              <ActionButton
+                busy={busy}
+                disabled={!previewPath.trim()}
+                onClick={() =>
+                  runRootTool("preview-file", { path: previewPath })
+                }
+              >
+                <MagnifyingGlass />
+                Preview file
               </ActionButton>
             </div>
           </ToolSection>

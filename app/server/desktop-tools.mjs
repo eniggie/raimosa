@@ -38,6 +38,8 @@ const CONTROL_TOOLS = new Set([
 const REMOTE_TOOLS = new Set([
   "find-files",
   "summarize-folder",
+  "storage-insights",
+  "device-vitals",
   "folder-snapshot",
   "list-applications",
   "launch-application",
@@ -235,6 +237,163 @@ async function summarizeFolder(payload) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 12),
     recent,
+  });
+}
+
+const MAX_HASH_BYTES = 32 * 1024 * 1024;
+
+async function storageInsights(payload) {
+  const root = await approvedRoot(payload.root);
+  const items = relativeItems(root, await walk(root)).filter(
+    (item) => item.type === "file",
+  );
+  const byCategory = {};
+  for (const item of items) {
+    const category = categoryFor(item.name);
+    byCategory[category] = (byCategory[category] ?? 0) + item.size;
+  }
+  const largest = [...items]
+    .sort((a, b) => b.size - a.size)
+    .slice(0, 15)
+    .map(({ path: itemPath, size, modifiedAt }) => ({
+      path: itemPath,
+      size,
+      modifiedAt,
+    }));
+  return receipt("storage-insights", root, {
+    files: items.length,
+    totalBytes: items.reduce((sum, item) => sum + item.size, 0),
+    byCategory: Object.entries(byCategory).sort((a, b) => b[1] - a[1]),
+    largest,
+  });
+}
+
+async function findDuplicates(payload) {
+  const root = await approvedRoot(payload.root);
+  const files = relativeItems(root, await walk(root)).filter(
+    (item) => item.type === "file" && item.size > 0,
+  );
+  // Same size first, then a full-content hash: no false duplicates.
+  const bySize = new Map();
+  for (const file of files) {
+    const group = bySize.get(file.size) ?? [];
+    group.push(file);
+    bySize.set(file.size, group);
+  }
+  const groups = [];
+  let skippedLarge = 0;
+  for (const candidates of bySize.values()) {
+    if (candidates.length < 2) continue;
+    const byHash = new Map();
+    for (const candidate of candidates) {
+      if (candidate.size > MAX_HASH_BYTES) {
+        skippedLarge += 1;
+        continue;
+      }
+      const absolute = await containedPath(root, candidate.path);
+      const content = await fs.readFile(absolute).catch(() => null);
+      if (!content) continue;
+      const hash = createHash("sha256").update(content).digest("hex");
+      const group = byHash.get(hash) ?? [];
+      group.push(candidate.path);
+      byHash.set(hash, group);
+    }
+    for (const [hash, paths] of byHash) {
+      if (paths.length >= 2)
+        groups.push({
+          hash: hash.slice(0, 16),
+          size: candidates[0].size,
+          paths,
+        });
+    }
+  }
+  groups.sort((a, b) => b.size - a.size);
+  return receipt("find-duplicates", root, {
+    duplicateGroups: groups.slice(0, 30),
+    groupCount: groups.length,
+    wastedBytes: groups.reduce(
+      (sum, group) => sum + group.size * (group.paths.length - 1),
+      0,
+    ),
+    skippedLargeFiles: skippedLarge,
+    note: "Detection is read-only. Removing duplicates requires an exact approved plan.",
+  });
+}
+
+async function previewFile(payload) {
+  const root = await approvedRoot(payload.root);
+  const file = await containedPath(root, payload.path);
+  const stat = await fs.stat(file);
+  if (!stat.isFile())
+    throw new Error("Choose one file inside the approved folder.");
+  const extension = path.extname(file).toLowerCase();
+  if (!TEXT_EXTENSIONS.has(extension))
+    throw new Error(
+      "Preview supports bounded text files only (md, txt, csv, json, code).",
+    );
+  const handle = await fs.open(file, "r");
+  try {
+    const buffer = Buffer.alloc(Math.min(stat.size, 16 * 1024));
+    await handle.read(buffer, 0, buffer.length, 0);
+    return receipt("preview-file", root, {
+      path: path.relative(root, file),
+      bytes: stat.size,
+      truncated: stat.size > buffer.length,
+      content: buffer.toString("utf8"),
+    });
+  } finally {
+    await handle.close();
+  }
+}
+
+async function deviceVitals() {
+  const cpus = os.cpus();
+  const load = os.loadavg();
+  const totalMemory = os.totalmem();
+  const freeMemory = os.freemem();
+  let disk = null;
+  const { stdout } = await execFileAsync("/bin/df", ["-k", os.homedir()], {
+    timeout: 10_000,
+  }).catch(() => ({ stdout: "" }));
+  const dfLine = stdout.split("\n")[1];
+  if (dfLine) {
+    const parts = dfLine.trim().split(/\s+/);
+    const [, blocks, used, available] = parts;
+    if (blocks && used && available) {
+      disk = {
+        totalBytes: Number(blocks) * 1024,
+        usedBytes: Number(used) * 1024,
+        availableBytes: Number(available) * 1024,
+      };
+    }
+  }
+  let battery = null;
+  if (process.platform === "darwin") {
+    const power = await execFileAsync("/usr/bin/pmset", ["-g", "batt"], {
+      timeout: 10_000,
+    }).catch(() => null);
+    const match = power?.stdout.match(/(\d+)%;\s*([^;]+);/);
+    if (match) battery = { percent: Number(match[1]), state: match[2].trim() };
+  }
+  return receipt("device-vitals", "local device health", {
+    platform: process.platform,
+    arch: os.arch(),
+    hostname: os.hostname(),
+    uptimeSeconds: Math.round(os.uptime()),
+    cpu: {
+      model: cpus[0]?.model ?? "unknown",
+      cores: cpus.length,
+      loadAverage: load.map((value) => Number(value.toFixed(2))),
+    },
+    memory: {
+      totalBytes: totalMemory,
+      freeBytes: freeMemory,
+      usedPercent: Number(
+        (((totalMemory - freeMemory) / totalMemory) * 100).toFixed(1),
+      ),
+    },
+    disk,
+    battery,
   });
 }
 
@@ -1084,6 +1243,18 @@ export function createDesktopToolService(options = {}) {
         break;
       case "summarize-folder":
         result = await summarizeFolder(effectivePayload);
+        break;
+      case "storage-insights":
+        result = await storageInsights(effectivePayload);
+        break;
+      case "find-duplicates":
+        result = await findDuplicates(effectivePayload);
+        break;
+      case "preview-file":
+        result = await previewFile(effectivePayload);
+        break;
+      case "device-vitals":
+        result = await deviceVitals();
         break;
       case "plan-organization":
         result = await planOrganization(effectivePayload);

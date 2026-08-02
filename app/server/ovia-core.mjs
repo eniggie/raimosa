@@ -29,6 +29,42 @@ export const capabilityCatalog = [
       "Report file counts, sizes, types, and recent changes inside an approved folder.",
   },
   {
+    id: "storage-insights",
+    title: "Analyze storage and largest files",
+    status: "available",
+    risk: "read-only",
+    adapter: "local-filesystem",
+    description:
+      "Report the largest files and bytes by category inside an approved folder.",
+  },
+  {
+    id: "find-duplicates",
+    title: "Find duplicate files",
+    status: "available",
+    risk: "read-only",
+    adapter: "local-filesystem",
+    description:
+      "Detect exact duplicate files by content hash inside an approved folder. Detection only; removal needs an approved plan.",
+  },
+  {
+    id: "preview-file",
+    title: "Preview a document",
+    status: "available",
+    risk: "read-only",
+    adapter: "local-filesystem",
+    description:
+      "Read a bounded text preview of one exact file inside an approved folder.",
+  },
+  {
+    id: "device-vitals",
+    title: "Check device vitals",
+    status: "available",
+    risk: "read-only",
+    adapter: "local-device-vitals",
+    description:
+      "Report CPU load, memory, disk, uptime, and battery for this device.",
+  },
+  {
     id: "organize-files",
     title: "Organize, rename, move, and archive files",
     status: "available",
@@ -178,6 +214,22 @@ const intentRules = [
   {
     id: "summarize-folder",
     words: ["summarize", "summary", "inventory", "folder"],
+  },
+  {
+    id: "storage-insights",
+    words: ["storage", "largest", "disk space", "space", "big files"],
+  },
+  {
+    id: "find-duplicates",
+    words: ["duplicate", "duplicates", "same file", "copies"],
+  },
+  {
+    id: "preview-file",
+    words: ["preview", "read file", "show file", "peek"],
+  },
+  {
+    id: "device-vitals",
+    words: ["vitals", "cpu", "memory", "battery", "device health", "uptime"],
   },
   {
     id: "organize-files",
