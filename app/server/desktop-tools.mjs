@@ -1,6 +1,6 @@
 import { createHash, randomInt, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { promises as fs, existsSync, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -66,6 +66,29 @@ const LEDGER_REDACTORS = {
       "File content is deliberately absent. The ledger is permanent; previewed bytes are not.",
   }),
 };
+
+// Installed copies can be launched from any directory, so state must not
+// follow the working directory — otherwise each launch location would grow
+// its own ledger and the receipt history would silently fragment.
+//
+// RAIMOSA_HOME overrides the state location; RAIMOSA_WORKSPACE overrides the
+// default approved folder. A source checkout keeps using ./local-workspace so
+// development and tests stay self-contained.
+export function raimosaHome() {
+  if (process.env.RAIMOSA_HOME) return path.resolve(process.env.RAIMOSA_HOME);
+  const checkout = path.resolve(process.cwd(), "local-workspace");
+  if (existsSync(path.join(checkout, "README.md")))
+    return path.join(checkout, ".raimosa");
+  return path.join(os.homedir(), ".raimosa");
+}
+
+export function defaultWorkspace() {
+  if (process.env.RAIMOSA_WORKSPACE)
+    return path.resolve(process.env.RAIMOSA_WORKSPACE);
+  const checkout = path.resolve(process.cwd(), "local-workspace");
+  if (existsSync(path.join(checkout, "README.md"))) return checkout;
+  return path.join(os.homedir(), "RAIMOSA Workspace");
+}
 
 function receipt(tool, scope, result) {
   return {
@@ -397,28 +420,77 @@ async function deviceVitals() {
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
   let disk = null;
-  const { stdout } = await execFileAsync("/bin/df", ["-k", os.homedir()], {
-    timeout: 10_000,
-  }).catch(() => ({ stdout: "" }));
-  const dfLine = stdout.split("\n")[1];
-  if (dfLine) {
-    const parts = dfLine.trim().split(/\s+/);
-    const [, blocks, used, available] = parts;
-    if (blocks && used && available) {
-      disk = {
-        totalBytes: Number(blocks) * 1024,
-        usedBytes: Number(used) * 1024,
-        availableBytes: Number(available) * 1024,
-      };
-    }
-  }
   let battery = null;
-  if (process.platform === "darwin") {
-    const power = await execFileAsync("/usr/bin/pmset", ["-g", "batt"], {
+
+  if (process.platform === "win32") {
+    const letter = (process.env.SystemDrive ?? "C:").replace(/[^A-Za-z]/g, "");
+    const { stdout } = await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `$d=Get-PSDrive -Name '${letter}';` +
+          "$b=Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1;" +
+          "[pscustomobject]@{Free=$d.Free;Used=$d.Used;Charge=$b.EstimatedChargeRemaining;Status=$b.BatteryStatus} | ConvertTo-Json -Compress",
+      ],
+      { timeout: 15_000, windowsHide: true },
+    ).catch(() => ({ stdout: "" }));
+    try {
+      const info = JSON.parse(stdout || "{}");
+      if (info.Free != null && info.Used != null)
+        disk = {
+          totalBytes: Number(info.Free) + Number(info.Used),
+          usedBytes: Number(info.Used),
+          availableBytes: Number(info.Free),
+        };
+      if (info.Charge != null)
+        battery = {
+          percent: Number(info.Charge),
+          state: Number(info.Status) === 2 ? "charging or AC" : "on battery",
+        };
+    } catch {
+      // Report nothing rather than a guess.
+    }
+  } else {
+    const { stdout } = await execFileAsync("df", ["-k", os.homedir()], {
       timeout: 10_000,
-    }).catch(() => null);
-    const match = power?.stdout.match(/(\d+)%;\s*([^;]+);/);
-    if (match) battery = { percent: Number(match[1]), state: match[2].trim() };
+    }).catch(() => ({ stdout: "" }));
+    const dfLine = stdout.split("\n")[1];
+    if (dfLine) {
+      const [, blocks, used, available] = dfLine.trim().split(/\s+/);
+      if (blocks && used && available)
+        disk = {
+          totalBytes: Number(blocks) * 1024,
+          usedBytes: Number(used) * 1024,
+          availableBytes: Number(available) * 1024,
+        };
+    }
+    if (process.platform === "darwin") {
+      const power = await execFileAsync("/usr/bin/pmset", ["-g", "batt"], {
+        timeout: 10_000,
+      }).catch(() => null);
+      const match = power?.stdout.match(/(\d+)%;\s*([^;]+);/);
+      if (match)
+        battery = { percent: Number(match[1]), state: match[2].trim() };
+    } else if (process.platform === "linux") {
+      const base = "/sys/class/power_supply";
+      const entries = await fs.readdir(base).catch(() => []);
+      const batteryDir = entries.find((entry) => /^BAT/i.test(entry));
+      if (batteryDir) {
+        const capacity = await fs
+          .readFile(path.join(base, batteryDir, "capacity"), "utf8")
+          .catch(() => null);
+        const status = await fs
+          .readFile(path.join(base, batteryDir, "status"), "utf8")
+          .catch(() => null);
+        if (capacity)
+          battery = {
+            percent: Number(capacity.trim()),
+            state: status?.trim() ?? "unknown",
+          };
+      }
+    }
   }
   return receipt("device-vitals", "local device health", {
     platform: process.platform,
@@ -489,31 +561,101 @@ async function folderSnapshot(payload) {
   });
 }
 
+// Each supported platform discovers installed applications from its own
+// conventional locations. Discovery is what makes control safe: launch and
+// quit only ever accept a path that appeared in this verified list.
 async function listApplications() {
-  if (process.platform !== "darwin")
-    throw new Error("Application control is available only on macOS.");
-  const roots = [
-    "/Applications",
-    "/System/Applications",
-    path.join(os.homedir(), "Applications"),
-  ];
   const applications = [];
-  for (const root of roots) {
-    const entries = await fs
-      .readdir(root, { withFileTypes: true })
-      .catch(() => []);
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !entry.name.endsWith(".app")) continue;
-      applications.push({
-        name: entry.name.replace(/\.app$/i, ""),
-        path: path.join(root, entry.name),
-      });
+  let scope = "installed applications";
+
+  if (process.platform === "darwin") {
+    scope = "macOS applications";
+    const roots = [
+      "/Applications",
+      "/System/Applications",
+      path.join(os.homedir(), "Applications"),
+    ];
+    for (const root of roots) {
+      const entries = await fs
+        .readdir(root, { withFileTypes: true })
+        .catch(() => []);
+      for (const entry of entries) {
+        if (!entry.isDirectory() || !entry.name.endsWith(".app")) continue;
+        applications.push({
+          name: entry.name.replace(/\.app$/i, ""),
+          path: path.join(root, entry.name),
+        });
+      }
     }
+  } else if (process.platform === "linux") {
+    scope = "Linux desktop entries";
+    const roots = [
+      "/usr/share/applications",
+      "/usr/local/share/applications",
+      "/var/lib/flatpak/exports/share/applications",
+      path.join(os.homedir(), ".local", "share", "applications"),
+    ];
+    for (const root of roots) {
+      const entries = await fs
+        .readdir(root, { withFileTypes: true })
+        .catch(() => []);
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith(".desktop")) continue;
+        const full = path.join(root, entry.name);
+        const content = await fs.readFile(full, "utf8").catch(() => "");
+        if (/^NoDisplay\s*=\s*true/im.test(content)) continue;
+        const name =
+          content.match(/^Name\s*=\s*(.+)$/im)?.[1]?.trim() ??
+          entry.name.replace(/\.desktop$/i, "");
+        applications.push({ name, path: full });
+      }
+    }
+  } else if (process.platform === "win32") {
+    scope = "Windows Start Menu applications";
+    const roots = [
+      path.join(
+        process.env.ProgramData ?? "C:\\ProgramData",
+        "Microsoft",
+        "Windows",
+        "Start Menu",
+        "Programs",
+      ),
+      path.join(
+        process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"),
+        "Microsoft",
+        "Windows",
+        "Start Menu",
+        "Programs",
+      ),
+    ];
+    const collect = async (root, depth = 0) => {
+      if (depth > 3 || applications.length >= 200) return;
+      const entries = await fs
+        .readdir(root, { withFileTypes: true })
+        .catch(() => []);
+      for (const entry of entries) {
+        const full = path.join(root, entry.name);
+        if (entry.isDirectory()) await collect(full, depth + 1);
+        else if (entry.name.toLowerCase().endsWith(".lnk"))
+          applications.push({
+            name: entry.name.replace(/\.lnk$/i, ""),
+            path: full,
+          });
+      }
+    };
+    for (const root of roots) await collect(root);
+  } else {
+    throw new Error(
+      `Application discovery is not implemented for ${process.platform}.`,
+    );
   }
-  return receipt("list-applications", "macOS applications", {
-    applications: applications
+
+  const unique = [...new Map(applications.map((a) => [a.path, a])).values()];
+  return receipt("list-applications", scope, {
+    platform: process.platform,
+    applications: unique
       .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, 80),
+      .slice(0, 120),
   });
 }
 
@@ -529,37 +671,115 @@ async function validateApplication(appPath) {
   return selected;
 }
 
+// Every platform opens a discovered target with its own OS opener, and the
+// target is always a validated path from the discovery list — never free text.
+async function openWithSystemOpener(target) {
+  if (process.platform === "darwin") {
+    await execFileAsync("/usr/bin/open", ["-g", target], { timeout: 10_000 });
+    return "macos-open";
+  }
+  if (process.platform === "linux") {
+    await execFileAsync("xdg-open", [target], { timeout: 10_000 });
+    return "linux-xdg-open";
+  }
+  if (process.platform === "win32") {
+    await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Start-Process -FilePath $args[0]",
+        target,
+      ],
+      { timeout: 15_000, windowsHide: true },
+    );
+    return "windows-start-process";
+  }
+  throw new Error(`Opening is not implemented for ${process.platform}.`);
+}
+
 async function launchApplication(payload) {
   const app = await validateApplication(payload.appPath);
-  await execFileAsync("/usr/bin/open", ["-g", app.path], { timeout: 10_000 });
+  const adapter = await openWithSystemOpener(app.path);
   return receipt("launch-application", app.path, {
     application: app.name,
+    adapter,
     state: "launch-request-accepted",
   });
 }
 
 async function closeApplication(payload) {
   const app = await validateApplication(payload.appPath);
-  const script = `tell application "${escapeAppleScript(app.name)}" to quit`;
-  await execFileAsync("/usr/bin/osascript", ["-e", script], {
-    timeout: 10_000,
-  });
+  if (process.platform === "darwin") {
+    const script = `tell application "${escapeAppleScript(app.name)}" to quit`;
+    await execFileAsync("/usr/bin/osascript", ["-e", script], {
+      timeout: 10_000,
+    });
+  } else if (process.platform === "win32") {
+    // Ask the window to close; never force-kill, so unsaved work is not lost.
+    await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Get-Process -Name $args[0] -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }",
+        app.name,
+      ],
+      { timeout: 15_000, windowsHide: true },
+    );
+  } else {
+    throw new Error(
+      `Quitting applications is not implemented for ${process.platform}.`,
+    );
+  }
   return receipt("close-application", app.path, {
     application: app.name,
     state: "quit-request-accepted",
   });
 }
 
-async function processStatus(payload) {
-  const query = String(payload.query ?? "")
-    .trim()
-    .toLowerCase();
-  const { stdout } = await execFileAsync(
-    "/bin/ps",
-    ["-axo", "pid=,etime=,comm="],
-    { timeout: 10_000, maxBuffer: 1024 * 1024 },
-  );
-  const processes = stdout
+// Bounded process listing, normalised to {pid, elapsed, command} everywhere.
+async function readProcessTable() {
+  if (process.platform === "win32") {
+    const { stdout } = await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Get-Process | Select-Object Id,ProcessName,StartTime | ConvertTo-Json -Compress",
+      ],
+      { timeout: 15_000, maxBuffer: 4 * 1024 * 1024, windowsHide: true },
+    );
+    const rows = JSON.parse(stdout || "[]");
+    const list = Array.isArray(rows) ? rows : [rows];
+    return list
+      .filter(Boolean)
+      .map((row) => {
+        const started = row.StartTime ? Date.parse(row.StartTime) : NaN;
+        const seconds = Number.isFinite(started)
+          ? Math.max(0, Math.round((Date.now() - started) / 1000))
+          : null;
+        return {
+          pid: Number(row.Id),
+          elapsed:
+            seconds === null
+              ? "unknown"
+              : `${Math.floor(seconds / 3600)}:${String(
+                  Math.floor((seconds % 3600) / 60),
+                ).padStart(2, "0")}`,
+          command: String(row.ProcessName ?? ""),
+        };
+      })
+      .filter((row) => Number.isFinite(row.pid) && row.command);
+  }
+  const { stdout } = await execFileAsync("ps", ["-axo", "pid=,etime=,comm="], {
+    timeout: 10_000,
+    maxBuffer: 1024 * 1024,
+  });
+  return stdout
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
@@ -569,7 +789,14 @@ async function processStatus(payload) {
         ? { pid: Number(match[1]), elapsed: match[2], command: match[3] }
         : null;
     })
-    .filter(Boolean)
+    .filter(Boolean);
+}
+
+async function processStatus(payload) {
+  const query = String(payload.query ?? "")
+    .trim()
+    .toLowerCase();
+  const processes = (await readProcessTable())
     .filter((item) => !query || item.command.toLowerCase().includes(query))
     .slice(0, 50);
   return receipt("process-status", "local process table", {
@@ -641,44 +868,79 @@ async function monitorAgentRuntimes() {
 }
 
 async function localNotification(payload) {
-  if (process.platform !== "darwin")
-    throw new Error("Local notifications are available only on macOS.");
-  const title = escapeAppleScript(
-    String(payload.title ?? "RAIMOSA AI").slice(0, 80),
-  );
-  const message = escapeAppleScript(
-    String(payload.message ?? "").slice(0, 240),
-  );
-  if (!message) throw new Error("Notification text is required.");
-  await execFileAsync(
-    "/usr/bin/osascript",
-    ["-e", `display notification "${message}" with title "${title}"`],
-    { timeout: 10_000 },
-  );
-  return receipt("local-notification", "current macOS user", {
-    title,
-    message,
+  const rawTitle = String(payload.title ?? "RAIMOSA AI").slice(0, 80);
+  const rawMessage = String(payload.message ?? "").slice(0, 240);
+  if (!rawMessage) throw new Error("Notification text is required.");
+
+  if (process.platform === "darwin") {
+    const title = escapeAppleScript(rawTitle);
+    const message = escapeAppleScript(rawMessage);
+    await execFileAsync(
+      "/usr/bin/osascript",
+      ["-e", `display notification "${message}" with title "${title}"`],
+      { timeout: 10_000 },
+    );
+  } else if (process.platform === "linux") {
+    // Arguments are passed as argv, never interpolated into a shell string.
+    await execFileAsync("notify-send", [rawTitle, rawMessage], {
+      timeout: 10_000,
+    });
+  } else if (process.platform === "win32") {
+    await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] > $null;" +
+          "$t=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02);" +
+          "$n=$t.GetElementsByTagName('text');" +
+          "$n.Item(0).AppendChild($t.CreateTextNode($args[0])) > $null;" +
+          "$n.Item(1).AppendChild($t.CreateTextNode($args[1])) > $null;" +
+          "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('RAIMOSA AI').Show([Windows.UI.Notifications.ToastNotification]::new($t))",
+        rawTitle,
+        rawMessage,
+      ],
+      { timeout: 15_000, windowsHide: true },
+    );
+  } else {
+    throw new Error(
+      `Local notifications are not implemented for ${process.platform}.`,
+    );
+  }
+
+  return receipt("local-notification", "current desktop user", {
+    title: rawTitle,
+    message: rawMessage,
+    platform: process.platform,
     state: "display-request-accepted",
   });
 }
 
 async function openDocument(payload) {
-  if (process.platform !== "darwin")
-    throw new Error("Document opening is available only on macOS.");
   const root = await approvedRoot(payload.root);
   const file = await containedPath(root, payload.path);
   const stat = await fs.stat(file);
   if (!stat.isFile())
     throw new Error("Choose one file inside the approved folder.");
-  await execFileAsync("/usr/bin/open", ["-g", file], { timeout: 10_000 });
+  const adapter = await openWithSystemOpener(file);
   return receipt("open-document", root, {
     path: path.relative(root, file),
+    adapter,
     state: "open-request-accepted",
   });
 }
 
 export function createDesktopToolService(options = {}) {
-  const stateDir = path.resolve(process.cwd(), "local-workspace", ".raimosa");
+  const stateDir = raimosaHome();
+  const workspaceRoot = defaultWorkspace();
+  // Make sure the default approved folder exists, so a fresh install has a
+  // usable scope instead of an error on first use.
+  try {
+    mkdirSync(workspaceRoot, { recursive: true });
+  } catch {
+    // A read-only home is reported by the health scan, not thrown at boot.
+  }
   const ledger = createLedger(
     options.ledgerFile ?? path.join(stateDir, "ledger.db"),
   );
@@ -977,7 +1239,7 @@ export function createDesktopToolService(options = {}) {
           0,
           Math.ceil((session.expiresAt - Date.now()) / 1000),
         ),
-        defaultWorkspace: path.resolve(process.cwd(), "local-workspace"),
+        defaultWorkspace: workspaceRoot,
         tools: [...REMOTE_TOOLS],
       },
     };
@@ -1029,7 +1291,7 @@ export function createDesktopToolService(options = {}) {
   }
 
   async function scanRuntime() {
-    const workspace = path.resolve(process.cwd(), "local-workspace");
+    const workspace = workspaceRoot;
     const checks = [];
     const findings = [];
 
@@ -1074,17 +1336,25 @@ export function createDesktopToolService(options = {}) {
       });
     }
 
-    const macOnly = capabilityCatalog.filter(
-      (item) =>
-        item.status === "available" && item.adapter?.startsWith("macos-"),
-    );
-    const platformReady = process.platform === "darwin" || macOnly.length === 0;
+    // No available capability may carry an adapter built for a different OS.
+    const adapterPlatforms = {
+      macos: "darwin",
+      linux: "linux",
+      windows: "win32",
+    };
+    const foreignAdapters = capabilityCatalog.filter((item) => {
+      if (item.status !== "available" || !item.adapter) return false;
+      const prefix = item.adapter.split("-")[0];
+      const required = adapterPlatforms[prefix];
+      return required && required !== process.platform;
+    });
+    const platformReady = foreignAdapters.length === 0;
     checks.push({
       id: "platform.compatibility",
       status: platformReady ? "pass" : "fail",
       detail: platformReady
-        ? `Runtime platform ${process.platform} matches registered adapters.`
-        : `${macOnly.length} macOS adapters are incorrectly available on ${process.platform}.`,
+        ? `Runtime platform ${process.platform} matches every registered adapter.`
+        : `${foreignAdapters.length} adapter(s) built for another OS are marked available on ${process.platform}.`,
     });
     if (!platformReady) {
       findings.push({
@@ -1357,7 +1627,7 @@ export function createDesktopToolService(options = {}) {
         runtime: "local-node-adapter",
         platform: process.platform,
         hostname: os.hostname(),
-        defaultWorkspace: path.resolve(process.cwd(), "local-workspace"),
+        defaultWorkspace: workspaceRoot,
         capabilities: capabilityCatalog,
         doctrine: oviaDoctrine(),
         emergency: emergencyStatus(),

@@ -1,5 +1,21 @@
 import { randomUUID } from "node:crypto";
 
+// RAIMOSA runs anywhere Node runs, but a capability is only "available" where
+// a real adapter for THIS platform exists. These helpers keep the catalog
+// honest per operating system instead of assuming macOS.
+const SUPPORTED_DESKTOPS = new Set(["darwin", "linux", "win32"]);
+
+function desktopAdapter(byPlatform) {
+  return byPlatform[process.platform] ?? null;
+}
+
+function desktopStatus(byPlatform) {
+  return SUPPORTED_DESKTOPS.has(process.platform) &&
+    byPlatform[process.platform]
+    ? "available"
+    : "unavailable";
+}
+
 export const capabilityCatalog = [
   {
     id: "raimosa-health-scan",
@@ -85,11 +101,17 @@ export const capabilityCatalog = [
   {
     id: "applications",
     title: "Open and close supported applications",
-    status: process.platform === "darwin" ? "available" : "unavailable",
+    status: desktopStatus({
+      darwin: true,
+      win32: true,
+    }),
     risk: "application-control",
-    adapter: process.platform === "darwin" ? "macos-open-osascript" : null,
+    adapter: desktopAdapter({
+      darwin: "macos-open-osascript",
+      win32: "windows-start-process",
+    }),
     description:
-      "Discover installed macOS applications and control only an exact selected application.",
+      "Discover installed applications and control only an exact selected application. Launch works on macOS and Windows; Linux discovery is read-only.",
   },
   {
     id: "process-status",
@@ -120,18 +142,26 @@ export const capabilityCatalog = [
   {
     id: "local-notification",
     title: "Send a local notification",
-    status: process.platform === "darwin" ? "available" : "unavailable",
+    status: desktopStatus({ darwin: true, linux: true, win32: true }),
     risk: "visible-side-effect",
-    adapter: process.platform === "darwin" ? "macos-notification" : null,
+    adapter: desktopAdapter({
+      darwin: "macos-notification",
+      linux: "linux-notify-send",
+      win32: "windows-toast",
+    }),
     description:
-      "Display a visible local macOS notification after an explicit request.",
+      "Display a visible local desktop notification after an explicit request.",
   },
   {
     id: "open-document",
     title: "Open a document",
-    status: process.platform === "darwin" ? "available" : "unavailable",
+    status: desktopStatus({ darwin: true, linux: true, win32: true }),
     risk: "application-control",
-    adapter: process.platform === "darwin" ? "macos-open" : null,
+    adapter: desktopAdapter({
+      darwin: "macos-open",
+      linux: "linux-xdg-open",
+      win32: "windows-start-process",
+    }),
     description: "Open one exact file inside the approved folder.",
   },
   {
