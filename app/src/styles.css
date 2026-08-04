@@ -3565,3 +3565,10 @@ textarea:focus-visible {
   outline-offset: 2px;
   box-shadow: 0 0 18px rgba(167, 139, 250, 0.35);
 }
+
+/* The ambient field is painted on body::before/::after, which sits outside
+   the .shell subtree the .reduced-motion class covers. App.jsx mirrors the
+   setting onto <body> so the in-app toggle stops it too. */
+body.reduced-motion-field::before {
+  animation: none !important;
+}

@@ -1771,6 +1771,14 @@ export function App() {
     );
   }, [settings]);
 
+  // The reduced-motion class lives on .shell, but the ambient field is
+  // painted on body::before — outside that subtree. Mirror the setting onto
+  // <body> so the in-app toggle actually stops every animation, not just the
+  // ones inside the shell.
+  useEffect(() => {
+    document.body.classList.toggle("reduced-motion-field", settings.motion);
+  }, [settings.motion]);
+
   useEffect(
     () => () => {
       if (simulationTimerRef.current)

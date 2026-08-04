@@ -59,7 +59,10 @@ test("an approval is single-use and cannot be replayed into duplicate side effec
   const service = open(paths);
   const plan = await service.handle("plan-organization", { root: paths.root });
   const { approvalId } = plan.result;
-  const access = service.startAccess({ duration: 300, confirmed: true }).session;
+  const access = service.startAccess({
+    duration: 300,
+    confirmed: true,
+  }).session;
 
   await service.handle("execute-organization", {
     approvalId,

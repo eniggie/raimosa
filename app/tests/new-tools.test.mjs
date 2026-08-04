@@ -36,7 +36,10 @@ test("duplicate detection matches content hashes, not names or sizes alone", asy
   // Identical content under different names: duplicates.
   await fs.writeFile(path.join(root, "report.md"), "# identical body\n");
   await fs.mkdir(path.join(root, "archive"));
-  await fs.writeFile(path.join(root, "archive", "copy.md"), "# identical body\n");
+  await fs.writeFile(
+    path.join(root, "archive", "copy.md"),
+    "# identical body\n",
+  );
   const service = open();
   const result = await service.handle("find-duplicates", { root });
   assert.equal(result.result.groupCount, 1);

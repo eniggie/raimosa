@@ -49,6 +49,24 @@ const REMOTE_TOOLS = new Set([
   "open-document",
 ]);
 
+// The ledger is append-only by design: nothing written to it can ever be
+// deleted. So any adapter that returns file *contents* must publish a
+// redacted projection for the ledger — evidence that the read happened,
+// never the bytes that were read. A tool listed here returns its full result
+// to the caller and stores only what this function yields.
+const LEDGER_REDACTORS = {
+  "preview-file": (result) => ({
+    path: result.path,
+    bytes: result.bytes,
+    truncated: result.truncated,
+    contentSha256: createHash("sha256")
+      .update(result.content ?? "")
+      .digest("hex"),
+    redacted:
+      "File content is deliberately absent. The ledger is permanent; previewed bytes are not.",
+  }),
+};
+
 function receipt(tool, scope, result) {
   return {
     id: `RC-${randomUUID().slice(0, 8).toUpperCase()}`,
@@ -241,6 +259,7 @@ async function summarizeFolder(payload) {
 }
 
 const MAX_HASH_BYTES = 32 * 1024 * 1024;
+const MAX_TOTAL_HASH_BYTES = 2 * 1024 * 1024 * 1024;
 
 async function storageInsights(payload) {
   const root = await approvedRoot(payload.root);
@@ -282,17 +301,28 @@ async function findDuplicates(payload) {
   }
   const groups = [];
   let skippedLarge = 0;
+  // Every other adapter here is bounded. Hashing must be too: without a total
+  // budget a folder of large duplicates would block the single-threaded
+  // adapter for minutes. When the budget runs out the scan stops and says so
+  // — a partial answer is reported as partial, never as complete.
+  let bytesHashed = 0;
+  let budgetExhausted = false;
   for (const candidates of bySize.values()) {
-    if (candidates.length < 2) continue;
+    if (candidates.length < 2 || budgetExhausted) continue;
     const byHash = new Map();
     for (const candidate of candidates) {
       if (candidate.size > MAX_HASH_BYTES) {
         skippedLarge += 1;
         continue;
       }
+      if (bytesHashed + candidate.size > MAX_TOTAL_HASH_BYTES) {
+        budgetExhausted = true;
+        break;
+      }
       const absolute = await containedPath(root, candidate.path);
       const content = await fs.readFile(absolute).catch(() => null);
       if (!content) continue;
+      bytesHashed += content.byteLength;
       const hash = createHash("sha256").update(content).digest("hex");
       const group = byHash.get(hash) ?? [];
       group.push(candidate.path);
@@ -316,7 +346,22 @@ async function findDuplicates(payload) {
       0,
     ),
     skippedLargeFiles: skippedLarge,
+    complete: !budgetExhausted && skippedLarge === 0,
+    bytesHashed,
     note: "Detection is read-only. Removing duplicates requires an exact approved plan.",
+    ...(budgetExhausted || skippedLarge
+      ? {
+          limitation: `Scan stopped early: ${
+            budgetExhausted
+              ? `the ${MAX_TOTAL_HASH_BYTES / 1024 ** 3} GB hashing budget was reached`
+              : ""
+          }${budgetExhausted && skippedLarge ? " and " : ""}${
+            skippedLarge
+              ? `${skippedLarge} file(s) exceeded the ${MAX_HASH_BYTES / 1024 ** 2} MB per-file limit`
+              : ""
+          }. More duplicates may exist.`,
+        }
+      : {}),
   });
 }
 
@@ -645,7 +690,17 @@ export function createDesktopToolService(options = {}) {
   );
 
   function record(nextReceipt) {
-    return ledger.append(nextReceipt);
+    const redactor = LEDGER_REDACTORS[nextReceipt.tool];
+    if (!redactor) return ledger.append(nextReceipt);
+    const stored = ledger.append({
+      ...nextReceipt,
+      result: redactor(nextReceipt.result),
+    });
+    return {
+      ...nextReceipt,
+      sequence: stored.sequence,
+      hash: stored.hash,
+    };
   }
 
   // Crash recovery. A runtime that stops takes the visible All Access
