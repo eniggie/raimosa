@@ -95,7 +95,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     /// Locate the Node runtime. A GUI app does not inherit the shell PATH, so
     /// the usual install locations are probed explicitly before giving up.
     private func findNode() -> String? {
-        var candidates = [
+        // A downloaded copy must run without the user installing anything, so
+        // the bundled runtime is always preferred. The system paths are only a
+        // fallback for development builds that were not packaged.
+        var candidates: [String] = []
+        if let resources = Bundle.main.resourcePath {
+            candidates.append("\(resources)/runtime/bin/node")
+        }
+        candidates += [
             "/usr/local/bin/node",
             "/opt/homebrew/bin/node",
             "/usr/bin/node",

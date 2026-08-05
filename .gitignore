@@ -4,3 +4,5 @@ dist/
 .DS_Store
 app/local-workspace/.raimosa/
 *.tgz
+dist-release/
+native/macos/build/

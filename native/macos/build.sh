@@ -30,13 +30,27 @@ say "Building the interface…"
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
-# 3. Compile the native shell.
-say "Compiling the native shell…"
-swiftc -O \
-  -target x86_64-apple-macosx13.0 \
-  -framework AppKit -framework WebKit \
-  -o "$CONTENTS/MacOS/RAIMOSA" \
-  "$ROOT/native/macos/RAIMOSA.swift"
+# 3. Compile the native shell as a universal binary so one download runs on
+#    both Apple Silicon and Intel Macs.
+say "Compiling the native shell (arm64 + x86_64)…"
+for arch in arm64 x86_64; do
+  swiftc -O \
+    -target "${arch}-apple-macosx13.0" \
+    -framework AppKit -framework WebKit \
+    -o "$OUT/RAIMOSA-$arch" \
+    "$ROOT/native/macos/RAIMOSA.swift" 2>/dev/null || true
+done
+if [ -f "$OUT/RAIMOSA-arm64" ] && [ -f "$OUT/RAIMOSA-x86_64" ]; then
+  lipo -create "$OUT/RAIMOSA-arm64" "$OUT/RAIMOSA-x86_64" \
+    -output "$CONTENTS/MacOS/RAIMOSA"
+  say "Universal binary: $(lipo -archs "$CONTENTS/MacOS/RAIMOSA")"
+elif [ -f "$OUT/RAIMOSA-$(uname -m)" ]; then
+  cp "$OUT/RAIMOSA-$(uname -m)" "$CONTENTS/MacOS/RAIMOSA"
+  say "Single-architecture build: $(uname -m)"
+else
+  fail "The native shell did not compile."
+fi
+rm -f "$OUT/RAIMOSA-arm64" "$OUT/RAIMOSA-x86_64"
 
 # 4. Copy the runtime the shell launches. Only what the product needs to run.
 say "Bundling the runtime…"
@@ -46,7 +60,25 @@ cp -R "$ROOT/app/server" "$CONTENTS/Resources/app/"
 cp -R "$ROOT/app/dist" "$CONTENTS/Resources/app/"
 cp "$ROOT/app/package.json" "$CONTENTS/Resources/app/"
 
-# 5. Icon.
+# 5. Bundle the Node runtime so a downloaded copy needs nothing installed.
+NODE_BIN="$(command -v node || true)"
+if [ -n "$NODE_BIN" ] && [ "${RAIMOSA_SKIP_NODE:-}" != "1" ]; then
+  say "Bundling Node $(node -v) ($(du -h "$NODE_BIN" | cut -f1))…"
+  mkdir -p "$CONTENTS/Resources/runtime/bin"
+  cp "$(readlink -f "$NODE_BIN" 2>/dev/null || echo "$NODE_BIN")" \
+    "$CONTENTS/Resources/runtime/bin/node"
+  chmod +x "$CONTENTS/Resources/runtime/bin/node"
+  ARCHS="$(lipo -archs "$CONTENTS/Resources/runtime/bin/node" 2>/dev/null || echo unknown)"
+  say "Bundled Node architectures: $ARCHS"
+  case "$ARCHS" in
+    *arm64*x86_64* | *x86_64*arm64*) : ;;
+    *) say "NOTE: the bundled Node is $ARCHS only, so this build targets $ARCHS Macs." ;;
+  esac
+else
+  say "NOTE: Node was not bundled. The app will require Node 22+ on the target Mac."
+fi
+
+# 6. Icon.
 if command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
   say "Generating the app icon…"
   ICONSET="$OUT/RAIMOSA.iconset"
@@ -61,7 +93,7 @@ if command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
   rm -rf "$ICONSET"
 fi
 
-# 6. Info.plist.
+# 7. Info.plist.
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -86,7 +118,7 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# 7. Ad-hoc sign so Gatekeeper treats it as a coherent bundle on this machine.
+# 8. Ad-hoc sign so Gatekeeper treats it as a coherent bundle on this machine.
 if command -v codesign >/dev/null 2>&1; then
   say "Signing (ad-hoc)…"
   codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || \

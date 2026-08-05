@@ -9,7 +9,32 @@ no external model provider.
 
 ---
 
-## Native apps
+## Download
+
+```bash
+./release.sh
+```
+
+Builds everything in `dist-release/`, after running the full test suite — if the
+suite fails, nothing is packaged.
+
+| Artifact | Size | Needs |
+|---|---|---|
+| `RAIMOSA-<version>-macOS.dmg` | ~87 MB | **Nothing.** Node is bundled; universal (Apple Silicon + Intel) |
+| `RAIMOSA-<version>-windows.zip` | ~1.5 MB | Node 22+ |
+| `RAIMOSA-<version>-linux.tar.gz` | ~1.5 MB | Node 22+ |
+
+Every build is checksummed. Verify a download with:
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt
+```
+
+**macOS:** open the `.dmg`, drag RAIMOSA to Applications, then **right-click → Open**
+the first time. That prompt appears because the build is ad-hoc signed rather than
+notarized with an Apple Developer ID; every later launch is a normal double-click.
+
+## Build from source
 
 ```bash
 ./native/macos/build.sh --install

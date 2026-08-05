@@ -116,6 +116,10 @@
 		<data>
 		aKXl51tJuXm2vgkyDqJKckoe964=
 		</data>
+		<key>Resources/runtime/bin/node</key>
+		<data>
+		qnSsJ3Qy2/yzTqHOUny4Qc1m4hM=
+		</data>
 	</dict>
 	<key>files2</key>
 	<dict>
@@ -313,6 +317,13 @@
 			<key>hash2</key>
 			<data>
 			hUkeW5x21GZlB6RkILnqoDO4C//YWfnuxqmFJE6PFYo=
+			</data>
+		</dict>
+		<key>Resources/runtime/bin/node</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			peu5rclpyPzEhoI62lMKQTCw1W7flU3nsFwoAXBIexo=
 			</data>
 		</dict>
 	</dict>
