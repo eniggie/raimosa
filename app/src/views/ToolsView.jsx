@@ -6,7 +6,9 @@ import {
   FolderIcon as Folder,
   MagnifyingGlassIcon as MagnifyingGlass,
   NotePencilIcon as NotePencil,
+  EyeIcon as Eye,
   PlayIcon as Play,
+  PowerIcon as Power,
   ShieldCheckIcon as ShieldCheck,
   StopIcon as Stop,
   WarningIcon as Warning,
@@ -85,6 +87,11 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
   const [previewPath, setPreviewPath] = useState("README.md");
   const [previousSnapshot, setPreviousSnapshot] = useState(null);
   const [vitals, setVitals] = useState(null);
+  const [compareTo, setCompareTo] = useState("");
+  const [clipText, setClipText] = useState("");
+  const [captureName, setCaptureName] = useState("raimosa-capture");
+  const [powerAction, setPowerAction] = useState("display-sleep");
+  const [powerConfirm, setPowerConfirm] = useState("");
 
   useEffect(() => {
     let current = true;
@@ -615,6 +622,171 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
               >
                 <Play />
                 Open exact document
+              </ActionButton>
+            ) : (
+              <AccessGate onRequestAccess={onRequestAccess} />
+            )}
+          </ToolSection>
+
+          <ToolSection
+            icon={Activity}
+            eyebrow="READ-ONLY"
+            title="Network status"
+            description="Active interfaces plus a real DNS resolution to prove connectivity. Hardware addresses are withheld."
+          >
+            <div className="tool-actions">
+              <ActionButton
+                busy={busy}
+                onClick={() => run("network-status", {})}
+              >
+                <Activity />
+                Check network
+              </ActionButton>
+            </div>
+          </ToolSection>
+
+          <ToolSection
+            icon={Folder}
+            eyebrow="READ-ONLY"
+            title="Compare two folders"
+            description="Report what exists only on one side and which shared files differ in size."
+          >
+            <label className="tool-field">
+              Compare the approved folder against
+              <input
+                value={compareTo}
+                onChange={(event) => setCompareTo(event.target.value)}
+                placeholder="/path/to/other/folder"
+              />
+            </label>
+            <div className="tool-actions">
+              <ActionButton
+                busy={busy}
+                disabled={!compareTo.trim()}
+                onClick={() =>
+                  runRootTool("compare-folders", {
+                    compareTo: compareTo.trim(),
+                  })
+                }
+              >
+                <Folder />
+                Compare folders
+              </ActionButton>
+            </div>
+          </ToolSection>
+
+          <ToolSection
+            icon={NotePencil}
+            eyebrow="CLIPBOARD"
+            title="Read and write the clipboard"
+            description="Read what is on the clipboard now, or replace it with exact text. Clipboard contents are never written to the ledger."
+          >
+            <div className="tool-actions">
+              <ActionButton
+                busy={busy}
+                onClick={() => run("read-clipboard", {})}
+              >
+                <MagnifyingGlass />
+                Read clipboard
+              </ActionButton>
+            </div>
+            <label className="tool-field">
+              Text to place on the clipboard
+              <input
+                value={clipText}
+                onChange={(event) => setClipText(event.target.value)}
+                placeholder="exact text"
+              />
+            </label>
+            {accessToken ? (
+              <ActionButton
+                busy={busy}
+                disabled={!clipText.trim()}
+                onClick={() => run("write-clipboard", { text: clipText })}
+              >
+                <NotePencil />
+                Replace clipboard
+              </ActionButton>
+            ) : (
+              <AccessGate onRequestAccess={onRequestAccess} />
+            )}
+          </ToolSection>
+
+          <ToolSection
+            icon={Eye}
+            eyebrow="SENSITIVE READ"
+            title="Capture the screen"
+            description="Write one full-screen capture into the approved folder and verify the image. Existing files are never replaced."
+          >
+            <label className="tool-field">
+              Image name
+              <input
+                value={captureName}
+                onChange={(event) => setCaptureName(event.target.value)}
+              />
+            </label>
+            {accessToken ? (
+              <ActionButton
+                busy={busy}
+                disabled={!captureName.trim()}
+                onClick={() =>
+                  runRootTool("capture-screen", { name: captureName })
+                }
+              >
+                <Eye />
+                Capture screen
+              </ActionButton>
+            ) : (
+              <AccessGate onRequestAccess={onRequestAccess} />
+            )}
+          </ToolSection>
+
+          <ToolSection
+            icon={Power}
+            eyebrow="HIGH IMPACT · STEP-UP REQUIRED"
+            title="Sleep, restart, or shut down"
+            description="Sleep takes effect immediately. Restart and shut down end every running session, so they also require a typed confirmation."
+          >
+            <label className="tool-field">
+              Action
+              <select
+                value={powerAction}
+                onChange={(event) => {
+                  setPowerAction(event.target.value);
+                  setPowerConfirm("");
+                }}
+              >
+                <option value="display-sleep">Sleep the display</option>
+                <option value="sleep">Sleep this device</option>
+                <option value="restart">Restart</option>
+                <option value="shutdown">Shut down</option>
+              </select>
+            </label>
+            {(powerAction === "restart" || powerAction === "shutdown") && (
+              <label className="tool-field">
+                Type {powerAction.toUpperCase()} to confirm
+                <input
+                  value={powerConfirm}
+                  onChange={(event) => setPowerConfirm(event.target.value)}
+                />
+              </label>
+            )}
+            {accessToken ? (
+              <ActionButton
+                busy={busy}
+                disabled={
+                  (powerAction === "restart" || powerAction === "shutdown") &&
+                  powerConfirm !== powerAction.toUpperCase()
+                }
+                onClick={() =>
+                  run("system-power", {
+                    action: powerAction,
+                    confirmation: powerConfirm,
+                  })
+                }
+              >
+                <Power />
+                Run power action
               </ActionButton>
             ) : (
               <AccessGate onRequestAccess={onRequestAccess} />

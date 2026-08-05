@@ -3245,67 +3245,63 @@ body:has(.remote-shell) {
 }
 
 /* ============================================================
-   RAIMOSA HOLO — futuristic design layer (2026-08-02)
-   Token-true: royal purple interaction, gold evidence, warm
-   ivory text, near-black field. Motion is fully disabled by
-   the existing reduced-motion rules.
+   RAIMOSA — LIQUID GLASS DESIGN SYSTEM
+   One layer, not three. Replaces the earlier stacked passes,
+   which fought each other and produced muddy, over-glowing
+   surfaces.
+
+   Rules this system holds to:
+     · One elevation scale. Panels do not all shout at once.
+     · One radius scale. 10 / 14 / 18, nothing in between.
+     · Glass earns its blur: chrome is frosted, content is calm.
+     · Gold is reserved for evidence. Purple is interaction.
+     · Motion is a response to input, never ambient decoration.
    ============================================================ */
 
 :root {
-  --glow-purple: rgba(109, 40, 217, 0.55);
-  --glow-violet: rgba(139, 92, 246, 0.4);
-  --glow-gold: rgba(214, 168, 67, 0.35);
-  --glass: rgba(14, 11, 22, 0.72);
-  --glass-line: rgba(167, 139, 250, 0.22);
+  /* Radius scale */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+
+  /* Glass */
+  --glass-1: rgba(255, 255, 255, 0.045);
+  --glass-2: rgba(255, 255, 255, 0.028);
+  --hairline: rgba(255, 255, 255, 0.1);
+  --hairline-lit: rgba(190, 168, 255, 0.4);
+  --sheen: rgba(255, 255, 255, 0.44);
+
+  /* Elevation — one scale, used consistently */
+  --e-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --e-2: 0 6px 20px rgba(4, 2, 10, 0.42);
+  --e-3: 0 18px 46px rgba(4, 2, 10, 0.52);
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-@keyframes raimosa-aurora {
-  0% {
-    transform: translate3d(-4%, -2%, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(4%, 3%, 0) scale(1.08);
-  }
-  100% {
-    transform: translate3d(-4%, -2%, 0) scale(1);
-  }
-}
+/* ---------- Field ---------- */
 
 body {
   background:
-    radial-gradient(1100px 700px at 82% -10%, #1b0b33 0%, transparent 60%),
-    radial-gradient(900px 640px at -12% 30%, #140a24 0%, transparent 55%),
-    radial-gradient(700px 520px at 55% 115%, #17091f 0%, transparent 60%),
+    radial-gradient(1200px 760px at 78% -12%, #1a0c30 0%, transparent 62%),
+    radial-gradient(900px 620px at -8% 34%, #120a1f 0%, transparent 58%),
     var(--black);
   background-attachment: fixed;
 }
 
+/* A single, still vignette. No ambient animation: the earlier drifting
+   aurora competed with real state changes for the eye. */
 body::before {
-  content: "";
-  position: fixed;
-  inset: -20%;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(38% 30% at 70% 18%, var(--glow-purple) 0%, transparent 70%),
-    radial-gradient(30% 26% at 18% 62%, var(--glow-violet) 0%, transparent 72%),
-    radial-gradient(22% 20% at 52% 88%, var(--glow-gold) 0%, transparent 75%);
-  opacity: 0.16;
-  filter: blur(60px);
-  animation: raimosa-aurora 26s ease-in-out infinite;
-}
-
-body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(167, 139, 250, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(167, 139, 250, 0.045) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(75% 65% at 50% 35%, #000 0%, transparent 100%);
+  background: radial-gradient(
+    62% 48% at 62% 14%,
+    rgba(109, 40, 217, 0.16) 0%,
+    transparent 72%
+  );
 }
 
 .shell,
@@ -3315,198 +3311,258 @@ main {
   background: transparent;
 }
 
-/* Glass chrome */
+/* ---------- Chrome: frosted, quiet ---------- */
+
 .topbar {
-  background: rgba(9, 6, 16, 0.78);
-  backdrop-filter: blur(18px) saturate(1.3);
-  -webkit-backdrop-filter: blur(18px) saturate(1.3);
-  border-bottom: 1px solid var(--glass-line);
-  box-shadow: 0 14px 40px rgba(5, 2, 12, 0.55);
+  background: rgba(9, 6, 16, 0.72);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: var(--e-1);
 }
 
 .sidenav {
-  background: rgba(11, 8, 17, 0.72);
-  backdrop-filter: blur(16px) saturate(1.25);
-  -webkit-backdrop-filter: blur(16px) saturate(1.25);
-  border-right: 1px solid var(--glass-line);
+  background: rgba(10, 7, 17, 0.6);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border-right: 1px solid var(--hairline);
 }
 
 .ovia {
-  background: rgba(10, 9, 17, 0.78);
-  backdrop-filter: blur(16px) saturate(1.25);
-  -webkit-backdrop-filter: blur(16px) saturate(1.25);
-  border-left: 1px solid var(--glass-line);
+  background: rgba(10, 8, 18, 0.66);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border-left: 1px solid var(--hairline);
 }
 
 .sidenav button {
+  border-radius: var(--r-sm);
+  margin: 0 8px;
+  height: 78px;
   transition:
-    color 160ms ease,
-    background 160ms ease;
+    background 160ms var(--ease),
+    color 160ms var(--ease);
 }
 
 .sidenav button:hover {
-  background: rgba(109, 40, 217, 0.14);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .sidenav button.active {
   background: linear-gradient(
-    90deg,
-    rgba(109, 40, 217, 0.32) 0%,
-    rgba(109, 40, 217, 0.06) 100%
+    180deg,
+    rgba(139, 92, 246, 0.22),
+    rgba(109, 40, 217, 0.12)
   );
   color: #fff;
-  text-shadow: 0 0 18px var(--glow-violet);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .sidenav button.active:before {
-  width: 3px;
-  background: linear-gradient(180deg, var(--gold2), var(--purple));
-  box-shadow:
-    0 0 12px var(--glow-gold),
-    0 0 22px var(--glow-purple);
+  inset: 14px auto 14px 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--gold2);
+  box-shadow: 0 0 10px rgba(246, 215, 130, 0.55);
 }
 
-/* Panels become glass with a lit top edge */
+/* ---------- Surfaces: calm glass, one elevation ---------- */
+
 .surface {
   position: relative;
-  border: 1px solid var(--glass-line);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--hairline);
   background:
-    linear-gradient(
-      180deg,
-      rgba(139, 92, 246, 0.07) 0%,
-      rgba(14, 11, 22, 0) 26%
-    ),
-    var(--glass);
-  border-radius: 12px;
+    linear-gradient(180deg, var(--glass-1), var(--glass-2)),
+    rgba(12, 9, 20, 0.58);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
   box-shadow:
-    inset 0 1px 0 rgba(248, 243, 231, 0.06),
-    0 18px 44px rgba(4, 2, 10, 0.5);
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    var(--e-2);
   transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    border-color 200ms var(--ease),
+    box-shadow 200ms var(--ease),
+    transform 200ms var(--ease);
 }
 
-.surface:hover {
-  border-color: rgba(167, 139, 250, 0.42);
+/* Only interactive panels respond. Static evidence panels stay still. */
+.live-tool:hover,
+.runtime-receipts:hover {
+  border-color: var(--hairline-lit);
   box-shadow:
-    inset 0 1px 0 rgba(248, 243, 231, 0.08),
-    0 22px 54px rgba(4, 2, 10, 0.6),
-    0 0 0 1px rgba(109, 40, 217, 0.12),
-    0 0 34px rgba(109, 40, 217, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    var(--e-3);
 }
 
-/* Command line and inputs */
-.command {
-  border: 1px solid rgba(139, 92, 246, 0.4);
-  background: rgba(12, 8, 21, 0.7);
-  border-radius: 11px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+/* One specular hairline along the top of each panel — the single glass cue. */
+.surface::before {
+  content: "";
+  position: absolute;
+  inset: 0 14% auto 14%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sheen) 50%,
+    transparent
+  );
+  opacity: 0.5;
+  pointer-events: none;
 }
 
-.command:focus-within {
-  border-color: var(--violet);
+/* ---------- Typography ---------- */
+
+.page-heading h1 {
+  color: var(--ivory);
+  letter-spacing: -0.028em;
+}
+
+.page-heading p {
+  color: #a49dae;
+}
+
+/* ---------- Controls ---------- */
+
+.primary,
+.secondary,
+.danger,
+.tool-action {
+  border-radius: var(--r-sm);
+  font-weight: 500;
+  transition:
+    background 160ms var(--ease),
+    border-color 160ms var(--ease),
+    box-shadow 160ms var(--ease),
+    transform 120ms var(--ease);
+}
+
+.primary {
+  background: linear-gradient(180deg, #8250e0, #6d28d9);
+  border: 1px solid rgba(167, 139, 250, 0.6);
   box-shadow:
-    0 0 0 3px rgba(109, 40, 217, 0.25),
-    0 0 26px rgba(109, 40, 217, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    var(--e-1);
 }
+
+.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #8f5df0, #7930e8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 4px 16px rgba(109, 40, 217, 0.4);
+}
+
+.primary:active:not(:disabled),
+.secondary:active:not(:disabled),
+.tool-action:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.secondary,
+.tool-action {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--hairline);
+  color: #e6e0ec;
+}
+
+.secondary:hover:not(:disabled),
+.tool-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.085);
+  border-color: var(--hairline-lit);
+}
+
+.danger:hover:not(:disabled) {
+  background: rgba(70, 16, 24, 0.7);
+}
+
+/* ---------- Inputs ---------- */
 
 input,
 select,
 textarea {
-  accent-color: var(--purple);
+  border-radius: var(--r-sm);
 }
 
-/* Controls */
-.primary,
-.secondary,
-.danger {
-  border-radius: 9px;
-  transition:
-    transform 140ms ease,
-    box-shadow 180ms ease,
-    background 180ms ease,
-    border-color 180ms ease;
+.command {
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--hairline);
+  box-shadow: none;
 }
 
-.primary {
-  background: linear-gradient(135deg, #7132cf 0%, #8b5cf6 55%, #6d28d9 100%);
-  border: 1px solid rgba(167, 139, 250, 0.75);
-  box-shadow:
-    0 6px 22px rgba(109, 40, 217, 0.42),
-    inset 0 1px 0 rgba(248, 243, 231, 0.22);
+.command:focus-within {
+  border-color: var(--hairline-lit);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.22);
 }
 
-.primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #7d3ddd 0%, #9a70f8 55%, #7c3aed 100%);
-  box-shadow:
-    0 8px 30px rgba(109, 40, 217, 0.58),
-    inset 0 1px 0 rgba(248, 243, 231, 0.26);
-  transform: translateY(-1px);
+.tool-field input,
+.tool-field select,
+.tool-field textarea,
+.scope-bar input,
+.ledger-filter {
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid var(--hairline);
 }
 
-.secondary {
-  background: rgba(17, 16, 26, 0.72);
-  border: 1px solid rgba(170, 164, 181, 0.45);
+.tool-field input:focus,
+.tool-field select:focus,
+.tool-field textarea:focus,
+.scope-bar input:focus {
+  border-color: var(--hairline-lit);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.2);
 }
 
-.secondary:hover:not(:disabled) {
-  border-color: var(--violet);
-  box-shadow: 0 0 22px rgba(109, 40, 217, 0.28);
-  transform: translateY(-1px);
+/* ---------- Status strips ---------- */
+
+.prototype-notice,
+.runtime-ledger-note,
+.scope-bar {
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: none;
 }
 
-.danger {
-  box-shadow: 0 0 0 rgba(239, 69, 69, 0);
+.runtime-ledger-note.ledger-note-broken {
+  border-color: rgba(226, 106, 106, 0.5);
+  background: rgba(120, 30, 30, 0.18);
 }
 
-.danger:hover:not(:disabled) {
-  box-shadow: 0 0 24px rgba(239, 69, 69, 0.35);
+/* ---------- Tool grid: denser, more even ---------- */
+
+.live-tool-grid {
+  gap: 16px;
 }
 
-/* Headline treatment: ivory into gold light */
-.page-heading h1 {
-  background: linear-gradient(
-    100deg,
-    var(--ivory) 0%,
-    #fdf6e3 45%,
-    var(--gold2) 78%,
-    var(--gold) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 44px rgba(214, 168, 67, 0.16);
+.live-tool {
+  padding: 20px 20px 22px;
 }
 
-/* Receipts and evidence read as instrumentation */
-.receipt-panel pre,
-.runtime-receipts pre {
-  border: 1px solid rgba(214, 168, 67, 0.2);
-  border-radius: 9px;
-  background:
-    linear-gradient(180deg, rgba(214, 168, 67, 0.05), transparent 30%),
-    rgba(7, 3, 13, 0.85);
+.live-tool header h2 {
+  letter-spacing: -0.012em;
 }
 
-/* Device vitals stat tiles */
+/* ---------- Stat tiles ---------- */
+
 .vitals-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(146px, 1fr));
+  gap: 10px;
   margin-top: 14px;
 }
 
 .vitals-grid article {
-  border: 1px solid var(--glass-line);
-  border-radius: 11px;
-  background:
-    linear-gradient(180deg, rgba(139, 92, 246, 0.09), transparent 42%),
-    rgba(10, 7, 17, 0.8);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.035);
   padding: 13px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -3514,18 +3570,15 @@ textarea {
   font:
     600 10px Montserrat,
     sans-serif;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.15em;
   color: var(--gold2);
 }
 
 .vitals-grid article strong {
   font:
-    600 26px/1.1 Montserrat,
+    500 25px/1.1 Montserrat,
     sans-serif;
-  background: linear-gradient(120deg, var(--ivory), var(--lav));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--ivory);
 }
 
 .vitals-grid article small {
@@ -3536,294 +3589,51 @@ textarea {
   white-space: nowrap;
 }
 
-/* Scrollbars match the field */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+/* ---------- Evidence ---------- */
+
+.receipt-panel pre,
+.runtime-receipts pre {
+  border: 1px solid rgba(214, 168, 67, 0.2);
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.34);
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+.runtime-receipt-row {
+  transition: background 140ms var(--ease);
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(109, 40, 217, 0.4);
-  border-radius: 8px;
-  border: 2px solid rgba(7, 3, 13, 0.9);
+.runtime-receipt-row:hover {
+  background: rgba(255, 255, 255, 0.028);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.6);
-}
+/* ---------- Ledger toolbar ---------- */
 
-/* Focus ring: one visible language everywhere */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--lav);
-  outline-offset: 2px;
-  box-shadow: 0 0 18px rgba(167, 139, 250, 0.35);
-}
-
-/* The ambient field is painted on body::before/::after, which sits outside
-   the .shell subtree the .reduced-motion class covers. App.jsx mirrors the
-   setting onto <body> so the in-app toggle stops it too. */
-body.reduced-motion-field::before {
-  animation: none !important;
-}
-
-/* ============================================================
-   RAIMOSA LIQUID GLASS — 2026-08-02
-   Refracting glass over a slow-moving light field. Specular top
-   edge, inner bloom, tinted depth, and a caustic sheen that
-   sweeps on hover. Every animation is disabled by the existing
-   reduced-motion rules and by body.reduced-motion-field.
-   ============================================================ */
-
-:root {
-  --lg-tint: rgba(139, 92, 246, 0.1);
-  --lg-edge: rgba(199, 180, 255, 0.34);
-  --lg-spec: rgba(255, 255, 255, 0.5);
-  --lg-depth: 0 24px 60px rgba(3, 1, 9, 0.62);
-}
-
-@keyframes raimosa-caustic {
-  0% {
-    transform: translate3d(-30%, 0, 0);
-  }
-  100% {
-    transform: translate3d(130%, 0, 0);
-  }
-}
-
-@keyframes raimosa-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(2%, -2%, 0) scale(1.05);
-  }
-}
-
-/* --- The field beneath the glass --- */
-body::before {
-  opacity: 0.2;
-  filter: blur(72px);
-}
-
-/* --- Core glass recipe --- */
-.surface,
-.vitals-grid article,
-.runtime-ledger-note,
-.prototype-notice,
-.scope-bar,
-.ledger-toolbar {
-  position: relative;
-  isolation: isolate;
-  border-radius: 16px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.075) 0%,
-      rgba(255, 255, 255, 0.022) 18%,
-      rgba(255, 255, 255, 0) 42%
-    ),
-    var(--lg-tint), rgba(11, 8, 19, 0.6);
-  border: 1px solid var(--lg-edge);
-  backdrop-filter: blur(26px) saturate(1.7);
-  -webkit-backdrop-filter: blur(26px) saturate(1.7);
-  box-shadow:
-    inset 0 1px 0 var(--lg-spec),
-    inset 0 -1px 0 rgba(109, 40, 217, 0.22),
-    inset 0 0 30px rgba(139, 92, 246, 0.07),
-    var(--lg-depth);
-}
-
-/* Specular highlight riding the top edge */
-.surface::before,
-.vitals-grid article::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 1px;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--lg-spec) 22%,
-    rgba(246, 215, 130, 0.6) 50%,
-    var(--lg-spec) 78%,
-    transparent 100%
-  );
-  opacity: 0.55;
-  pointer-events: none;
-  z-index: 2;
-}
-
-/* Caustic sheen sweeping across the glass on hover */
-.surface::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0;
-  background: linear-gradient(
-    104deg,
-    transparent 38%,
-    rgba(255, 255, 255, 0.07) 47%,
-    rgba(214, 168, 67, 0.09) 52%,
-    transparent 62%
-  );
-  transition: opacity 420ms ease;
-}
-
-.surface:hover::after {
-  opacity: 1;
-  animation: raimosa-caustic 1.5s ease-out;
-}
-
-.surface:hover {
-  border-color: rgba(214, 195, 255, 0.55);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -1px 0 rgba(109, 40, 217, 0.3),
-    inset 0 0 40px rgba(139, 92, 246, 0.12),
-    0 28px 70px rgba(3, 1, 9, 0.68),
-    0 0 42px rgba(109, 40, 217, 0.2);
-}
-
-/* --- Chrome as thicker, colder glass --- */
-.topbar,
-.sidenav,
-.ovia {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.05) 0%,
-      rgba(255, 255, 255, 0) 30%
-    ),
-    rgba(9, 6, 16, 0.62);
-  backdrop-filter: blur(32px) saturate(1.8);
-  -webkit-backdrop-filter: blur(32px) saturate(1.8);
-  border-color: var(--lg-edge);
-}
-
-.topbar {
-  box-shadow:
-    inset 0 -1px 0 rgba(167, 139, 250, 0.18),
-    0 18px 50px rgba(3, 1, 9, 0.5);
-}
-
-/* Active nav pill reads as lit glass, not a flat block */
-.sidenav button.active {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(167, 139, 250, 0.26) 0%,
-      rgba(109, 40, 217, 0.08) 62%,
-      transparent 100%
-    ),
-    rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-
-/* --- Controls: liquid pills --- */
-.primary,
-.secondary,
-.danger,
-.tool-action {
-  border-radius: 12px;
-  position: relative;
-  overflow: hidden;
-}
-
-.primary {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.24) 0%,
-      rgba(255, 255, 255, 0) 46%
-    ),
-    linear-gradient(135deg, #7132cf 0%, #9061f5 52%, #6d28d9 100%);
-  border-color: rgba(199, 180, 255, 0.72);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.42),
-    0 10px 26px rgba(109, 40, 217, 0.42);
-}
-
-.secondary,
-.tool-action {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.08) 0%,
-      rgba(255, 255, 255, 0) 44%
-    ),
-    rgba(16, 13, 26, 0.6);
-  border-color: rgba(186, 178, 200, 0.4);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.secondary:hover:not(:disabled),
-.tool-action:hover:not(:disabled) {
-  border-color: rgba(199, 180, 255, 0.72);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 0 26px rgba(109, 40, 217, 0.3);
-}
-
-/* --- Inputs as recessed glass --- */
-input,
-select,
-textarea {
-  border-radius: 11px;
-}
-
-.command {
-  border-radius: 14px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(255, 255, 255, 0) 40%
-    ),
-    rgba(10, 7, 18, 0.62);
-  border-color: rgba(167, 139, 250, 0.44);
-  box-shadow: inset 0 2px 8px rgba(3, 1, 9, 0.5);
-}
-
-/* --- Ledger toolbar: filter + export --- */
 .ledger-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 10px 12px;
   margin-bottom: 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.032);
 }
 
 .ledger-filter {
   display: flex;
   align-items: center;
   gap: 9px;
-  flex: 1 1 240px;
+  flex: 1 1 220px;
   min-width: 0;
   padding: 0 12px;
-  height: 42px;
-  border-radius: 11px;
-  border: 1px solid rgba(167, 139, 250, 0.3);
-  background: rgba(8, 5, 15, 0.55);
+  height: 40px;
+  border-radius: var(--r-sm);
 }
 
 .ledger-filter svg {
   flex: 0 0 auto;
-  color: var(--lav);
+  color: var(--muted);
 }
 
 .ledger-filter input {
@@ -3845,17 +3655,80 @@ textarea {
 .ledger-export {
   display: flex;
   flex-wrap: wrap;
-  gap: 9px;
+  gap: 8px;
   margin-left: auto;
 }
 
 .ledger-export button {
-  height: 42px;
+  height: 40px;
   font-size: 13px;
 }
 
-/* --- Motion opt-out covers the new animations too --- */
-body.reduced-motion-field::before,
-body.reduced-motion-field .surface:hover::after {
-  animation: none !important;
+/* ---------- Empty states: useful, not decorative ---------- */
+
+.runtime-empty {
+  padding: 44px 28px;
+  text-align: center;
+}
+
+.runtime-empty svg {
+  color: var(--lav);
+  opacity: 0.5;
+}
+
+.runtime-empty h2 {
+  margin: 14px 0 6px;
+  font:
+    500 19px Montserrat,
+    sans-serif;
+}
+
+.runtime-empty p {
+  color: var(--muted);
+  margin: 0 auto;
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ---------- Scrollbars ---------- */
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 139, 250, 0.42);
+  background-clip: content-box;
+}
+
+/* ---------- Focus: one visible language ---------- */
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--lav);
+  outline-offset: 2px;
+}
+
+/* ---------- Native shell ---------- */
+
+/* Inside RAIMOSA.app the traffic lights float over a transparent titlebar,
+   so the top bar reserves room for them instead of hiding under them. */
+.native-macos .topbar {
+  padding-left: 78px;
 }

@@ -9,10 +9,11 @@ test("the capability catalog exposes only implemented controls as available", ()
   assert.ok(available.includes("find-files"));
   assert.ok(available.includes("mobile-remote"));
   assert.ok(available.includes("agent-runtime-monitor"));
-  assert.equal(
-    capabilityCatalog.find((item) => item.id === "system-power").status,
-    "unavailable",
-  );
+  // system-power has a verified adapter now; what must stay true is that it
+  // carries its real risk class rather than being quietly downgraded.
+  const power = capabilityCatalog.find((item) => item.id === "system-power");
+  assert.equal(power.risk, "high-impact");
+  if (power.status === "available") assert.ok(power.adapter);
   assert.equal(
     capabilityCatalog.find((item) => item.id === "model-reasoning").status,
     "unavailable",
@@ -31,10 +32,13 @@ test("OVIA AI Core compiles read-only and blocked plans honestly", () => {
   assert.equal(readOnly.decision, "ready-read-only");
   assert.equal(readOnly.requiresApproval, false);
 
-  const blocked = planCommand("shut down the desktop");
-  assert.equal(blocked.capabilityId, "system-power");
-  assert.equal(blocked.decision, "unavailable");
-  assert.equal(blocked.available, false);
+  // system-power now has a verified adapter, so it plans — but as a
+  // high-impact action that can never run without explicit approval.
+  const power = planCommand("shut down the desktop");
+  assert.equal(power.capabilityId, "system-power");
+  assert.equal(power.decision, "approval-required");
+  assert.equal(power.requiresApproval, true);
+  assert.equal(power.risk, "high-impact");
 
   const blockedAgent = planCommand("command claude to review this code");
   assert.equal(blockedAgent.capabilityId, "agent-command-bridge");

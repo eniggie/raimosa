@@ -1847,6 +1847,12 @@ export function App() {
     document.body.classList.toggle("reduced-motion-field", settings.motion);
   }, [settings.motion]);
 
+  // Inside RAIMOSA.app the window uses a transparent titlebar, so the shell
+  // must reserve space for the traffic lights rather than sit beneath them.
+  useEffect(() => {
+    if (health?.native === "macos") document.body.classList.add("native-macos");
+  }, [health?.native]);
+
   useEffect(
     () => () => {
       if (simulationTimerRef.current)

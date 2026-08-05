@@ -9,6 +9,18 @@ no external model provider.
 
 ---
 
+## Native app (macOS)
+
+```bash
+./native/macos/build.sh --install
+```
+
+Builds `RAIMOSA.app` — a real AppKit application with its own window, menu bar,
+and dock icon — and installs it to `/Applications`. It owns the runtime: the
+local server starts when the app opens and is terminated when it quits, so no
+authority can outlive its window. Needs the Xcode Command Line Tools
+(`xcode-select --install`). Ad-hoc signed, not notarized.
+
 ## Install
 
 **Requirements:** [Node.js 22 or newer](https://nodejs.org). Node 22 is the first
@@ -74,11 +86,16 @@ exists. Anything else is explained but never given a button.
 | Device vitals, process status, folder monitoring | ✅ | ✅ | ✅ |
 | Open a document | ✅ | ✅ | ✅ |
 | Local notification | ✅ | ✅¹ | ✅ |
+| Network status, compare folders | ✅ | ✅ | ✅ |
+| Read / write the clipboard | ✅ | ✅² | ✅ |
+| Sleep, restart, shut down | ✅ | ✅ | ✅ |
+| Capture the screen | ✅ | — | — |
 | Discover installed applications | ✅ | ✅ | ✅ |
 | Launch / quit an application | ✅ | — | ✅ |
-| Sleep, restart, shut down · screen capture · model reasoning | — | — | — |
+| Model reasoning · command external AI agents | — | — | — |
 
 ¹ Linux notifications use `notify-send` (`libnotify`), preinstalled on most desktops.
+² Linux clipboard needs `xclip`.
 
 ## Safety model
 
