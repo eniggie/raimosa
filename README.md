@@ -9,17 +9,27 @@ no external model provider.
 
 ---
 
-## Native app (macOS)
+## Native apps
 
 ```bash
 ./native/macos/build.sh --install
 ```
 
-Builds `RAIMOSA.app` — a real AppKit application with its own window, menu bar,
+**macOS** — builds `RAIMOSA.app` — a real AppKit application with its own window, menu bar,
 and dock icon — and installs it to `/Applications`. It owns the runtime: the
 local server starts when the app opens and is terminated when it quits, so no
 authority can outlive its window. Needs the Xcode Command Line Tools
 (`xcode-select --install`). Ad-hoc signed, not notarized.
+
+**Windows** — `powershell -ExecutionPolicy Bypass -File .\native\windows\RAIMOSA.ps1`
+opens a WebView2 window that owns the runtime the same way.
+
+**Linux** — `./native/linux/install-desktop.sh` adds RAIMOSA to your application
+menu with its own icon and a dedicated app window.
+
+> The Windows and Linux shells were written on macOS and have **not been run on
+> real hardware yet**. Both say so in their own files. The macOS build is the one
+> that has been verified end to end.
 
 ## Install
 

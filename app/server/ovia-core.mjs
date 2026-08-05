@@ -186,7 +186,7 @@ export const capabilityCatalog = [
     id: "clipboard",
     title: "Read and write the clipboard",
     status: desktopStatus({ darwin: true, linux: true, win32: true }),
-    risk: "visible-side-effect",
+    risk: "sensitive-read",
     adapter: desktopAdapter({
       darwin: "macos-pbcopy",
       linux: "linux-xclip",

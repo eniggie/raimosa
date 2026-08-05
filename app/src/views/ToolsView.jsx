@@ -679,17 +679,8 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
             icon={NotePencil}
             eyebrow="CLIPBOARD"
             title="Read and write the clipboard"
-            description="Read what is on the clipboard now, or replace it with exact text. Clipboard contents are never written to the ledger."
+            description="Read what is on the clipboard now, or replace it with exact text. The clipboard has no folder scope, so reads are gated too. Contents are never written to the ledger."
           >
-            <div className="tool-actions">
-              <ActionButton
-                busy={busy}
-                onClick={() => run("read-clipboard", {})}
-              >
-                <MagnifyingGlass />
-                Read clipboard
-              </ActionButton>
-            </div>
             <label className="tool-field">
               Text to place on the clipboard
               <input
@@ -699,14 +690,23 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
               />
             </label>
             {accessToken ? (
-              <ActionButton
-                busy={busy}
-                disabled={!clipText.trim()}
-                onClick={() => run("write-clipboard", { text: clipText })}
-              >
-                <NotePencil />
-                Replace clipboard
-              </ActionButton>
+              <div className="tool-actions">
+                <ActionButton
+                  busy={busy}
+                  onClick={() => run("read-clipboard", {})}
+                >
+                  <MagnifyingGlass />
+                  Read clipboard
+                </ActionButton>
+                <ActionButton
+                  busy={busy}
+                  disabled={!clipText.trim()}
+                  onClick={() => run("write-clipboard", { text: clipText })}
+                >
+                  <NotePencil />
+                  Replace clipboard
+                </ActionButton>
+              </div>
             ) : (
               <AccessGate onRequestAccess={onRequestAccess} />
             )}

@@ -1,6 +1,12 @@
 # ADR-001: Use Tauri 2 for the RAIMOSA Desktop Shell
 
-**Status:** Accepted for MVP  
+> **⚠️ SUPERSEDED for the shipped shell — see [ADR-002](ADR-002-NATIVE-SHELL-SWIFT.md)
+> (August 5, 2026).** The reasoning below still holds; Tauri was not shipped because
+> it requires a Rust toolchain that the build machine does not have. The macOS shell
+> is AppKit + WKWebView compiled with `swiftc`. This document is kept as the record
+> of the original decision, not as a description of what runs today.
+
+**Status:** Superseded by ADR-002  
 **Date:** July 20, 2026  
 **Decision owners:** Product and engineering
 

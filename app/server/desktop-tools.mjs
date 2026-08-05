@@ -29,6 +29,10 @@ const MAX_TEXT_BYTES = 64 * 1024;
 const MAX_BODY_BYTES = 1024 * 1024;
 const ACCESS_DURATIONS = new Set([300, 600, 900]);
 const CONTROL_TOOLS = new Set([
+  // Reading the clipboard is gated too. Every other sensitive read in RAIMOSA
+  // is bounded by an approved folder; the clipboard has no scope at all and
+  // routinely holds passwords, 2FA codes, and API keys.
+  "read-clipboard",
   "write-clipboard",
   "capture-screen",
   "system-power",

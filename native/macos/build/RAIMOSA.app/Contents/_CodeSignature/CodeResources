@@ -12,9 +12,9 @@
 		<data>
 		3OgdP7VVwFLOdFmAb7ljRgmDtjg=
 		</data>
-		<key>Resources/app/dist/assets/index-C9L5gsOA.js</key>
+		<key>Resources/app/dist/assets/index-B4NE8lv4.js</key>
 		<data>
-		71wrR65fr5kyMzK0/SLYMwFaqNg=
+		Got6tihbNzs2WJtHn2ukEzpcHQM=
 		</data>
 		<key>Resources/app/dist/assets/index-CCdLl3P4.css</key>
 		<data>
@@ -82,7 +82,7 @@
 		</data>
 		<key>Resources/app/dist/index.html</key>
 		<data>
-		TeUI+QvkqH9NSbdvpG+q+f9icOo=
+		HilPz3Abv/nbD4ThNTD43sZzV20=
 		</data>
 		<key>Resources/app/package.json</key>
 		<data>
@@ -94,7 +94,7 @@
 		</data>
 		<key>Resources/app/server/desktop-tools.mjs</key>
 		<data>
-		pJrpjROz4eY67p5McRgeme0krmY=
+		3I8lElaF9EFvrp2lDAyeaaJY0+4=
 		</data>
 		<key>Resources/app/server/ledger.mjs</key>
 		<data>
@@ -102,7 +102,7 @@
 		</data>
 		<key>Resources/app/server/ovia-core.mjs</key>
 		<data>
-		plW69i+7+KU5Q49pA4QsH7XN1vo=
+		PDg1ae8MGWRIvWYeVhDQq8lj8bs=
 		</data>
 		<key>Resources/app/server/raimosa-plugin.mjs</key>
 		<data>
@@ -133,11 +133,11 @@
 			WuVtl+GXPS9yoTclCpa0w0ARjRHRuyaJUT5MVWBVeG8=
 			</data>
 		</dict>
-		<key>Resources/app/dist/assets/index-C9L5gsOA.js</key>
+		<key>Resources/app/dist/assets/index-B4NE8lv4.js</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			wGb7j/mp81omfawv8IrdZQ7BZ2+wHxO7EUNrQpoKQQI=
+			fXofyrxwHM76yM6zVA0HQskd+cMgBq/f27pUK8TsAsI=
 			</data>
 		</dict>
 		<key>Resources/app/dist/assets/index-CCdLl3P4.css</key>
@@ -256,7 +256,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			IhZMwb3vlPMgKsfq6q60muybhGtZv3X4MMVppWiEAX0=
+			+Ds1135Qqtd/s9R1fbxapAfJdNO3tALb7Laam988bPk=
 			</data>
 		</dict>
 		<key>Resources/app/package.json</key>
@@ -277,7 +277,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			TDpLXitvJAJ1m2EoY7dtzCedTBf73RTLK5z1xH9zRt4=
+			ZuIu0T2hXHK0M8eAdu0er25L8p1g6ZraVJfFgHkqopo=
 			</data>
 		</dict>
 		<key>Resources/app/server/ledger.mjs</key>
@@ -291,7 +291,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			yk9pgyQA9cd6GtB+tbauce/Zul5EoliQQaESQhaHJ1s=
+			m9xPlhWXeWPSnOvRnqGmJmNhBxLqMntdjxyn/C3Rxvk=
 			</data>
 		</dict>
 		<key>Resources/app/server/raimosa-plugin.mjs</key>

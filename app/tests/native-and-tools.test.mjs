@@ -68,7 +68,9 @@ test("clipboard contents never reach the permanent ledger", async (t) => {
   });
   assert.equal(written.result.content, secret);
 
-  const read = await service.handle("read-clipboard", {});
+  const read = await service.handle("read-clipboard", {
+    accessToken: access.session.token,
+  });
   assert.match(read.result.content, /CLIPBOARD-SECRET/);
 
   const ledger = service.listReceipts(20);
