@@ -12,6 +12,7 @@ import {
   CheckCircleIcon as CheckCircle,
   ClockIcon as Clock,
   DeviceMobileIcon as DeviceMobile,
+  DownloadSimpleIcon as DownloadSimple,
   EyeIcon as Eye,
   FingerprintIcon as Fingerprint,
   FolderIcon as Folder,
@@ -714,6 +715,37 @@ function RuntimeLedgerView({ onOpenSample }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState("");
+  const [exporting, setExporting] = useState("");
+
+  const visible = filter
+    ? receipts.filter(
+        (entry) =>
+          entry.tool.toLowerCase().includes(filter.toLowerCase()) ||
+          entry.scope.toLowerCase().includes(filter.toLowerCase()),
+      )
+    : receipts;
+
+  async function exportReceipts(format) {
+    setExporting(format);
+    setError("");
+    try {
+      const data = await desktopApi.exportReceipts(format, filter);
+      const blob = new Blob([data.content], {
+        type: format === "csv" ? "text/csv" : "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = data.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (exportError) {
+      setError(exportError.message);
+    } finally {
+      setExporting("");
+    }
+  }
 
   async function refresh() {
     setLoading(true);
@@ -766,6 +798,42 @@ function RuntimeLedgerView({ onOpenSample }) {
           </div>
         }
       />
+      {receipts.length > 0 && (
+        <div className="ledger-toolbar">
+          <label className="ledger-filter">
+            <MagnifyingGlass size={17} />
+            <input
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              placeholder="Filter by tool or scope"
+              aria-label="Filter receipts by tool or scope"
+            />
+          </label>
+          <span className="ledger-count" role="status">
+            {visible.length} of {receipts.length} shown
+          </span>
+          <div className="ledger-export">
+            <button
+              type="button"
+              className="secondary"
+              disabled={Boolean(exporting)}
+              onClick={() => exportReceipts("json")}
+            >
+              <DownloadSimple size={17} />
+              {exporting === "json" ? "Exporting…" : "Export JSON"}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={Boolean(exporting)}
+              onClick={() => exportReceipts("csv")}
+            >
+              <DownloadSimple size={17} />
+              {exporting === "csv" ? "Exporting…" : "Export CSV"}
+            </button>
+          </div>
+        </div>
+      )}
       <div
         className={`runtime-ledger-note${
           integrity && !integrity.intact ? " ledger-note-broken" : ""
@@ -816,7 +884,7 @@ function RuntimeLedgerView({ onOpenSample }) {
             <span>Time</span>
             <span>Evidence</span>
           </div>
-          {receipts.map((item) => (
+          {visible.map((item) => (
             <details key={item.id} className="runtime-receipt-row">
               <summary>
                 <span>

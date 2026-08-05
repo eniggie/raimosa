@@ -91,6 +91,9 @@ exists. Anything else is explained but never given a button.
 - Every adapter call writes an **append-only, hash-chained receipt**. Altering,
   deleting, or reordering a receipt is detectable and reported by the health scan.
 - File **contents are never written to the ledger** — only path, size, and a hash.
+- Every adapter call is checked against the capability registry **on the server**,
+  not just in the interface: a tool with no verified adapter for your OS cannot run.
+- Receipts export to JSON or CSV with a live integrity attestation attached.
 - Writes never overwrite. File moves need an exact plan plus a one-time confirmation.
   Nothing is ever deleted.
 

@@ -3572,3 +3572,290 @@ textarea:focus-visible {
 body.reduced-motion-field::before {
   animation: none !important;
 }
+
+/* ============================================================
+   RAIMOSA LIQUID GLASS — 2026-08-02
+   Refracting glass over a slow-moving light field. Specular top
+   edge, inner bloom, tinted depth, and a caustic sheen that
+   sweeps on hover. Every animation is disabled by the existing
+   reduced-motion rules and by body.reduced-motion-field.
+   ============================================================ */
+
+:root {
+  --lg-tint: rgba(139, 92, 246, 0.1);
+  --lg-edge: rgba(199, 180, 255, 0.34);
+  --lg-spec: rgba(255, 255, 255, 0.5);
+  --lg-depth: 0 24px 60px rgba(3, 1, 9, 0.62);
+}
+
+@keyframes raimosa-caustic {
+  0% {
+    transform: translate3d(-30%, 0, 0);
+  }
+  100% {
+    transform: translate3d(130%, 0, 0);
+  }
+}
+
+@keyframes raimosa-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, -2%, 0) scale(1.05);
+  }
+}
+
+/* --- The field beneath the glass --- */
+body::before {
+  opacity: 0.2;
+  filter: blur(72px);
+}
+
+/* --- Core glass recipe --- */
+.surface,
+.vitals-grid article,
+.runtime-ledger-note,
+.prototype-notice,
+.scope-bar,
+.ledger-toolbar {
+  position: relative;
+  isolation: isolate;
+  border-radius: 16px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.075) 0%,
+      rgba(255, 255, 255, 0.022) 18%,
+      rgba(255, 255, 255, 0) 42%
+    ),
+    var(--lg-tint), rgba(11, 8, 19, 0.6);
+  border: 1px solid var(--lg-edge);
+  backdrop-filter: blur(26px) saturate(1.7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 0 var(--lg-spec),
+    inset 0 -1px 0 rgba(109, 40, 217, 0.22),
+    inset 0 0 30px rgba(139, 92, 246, 0.07),
+    var(--lg-depth);
+}
+
+/* Specular highlight riding the top edge */
+.surface::before,
+.vitals-grid article::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--lg-spec) 22%,
+    rgba(246, 215, 130, 0.6) 50%,
+    var(--lg-spec) 78%,
+    transparent 100%
+  );
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Caustic sheen sweeping across the glass on hover */
+.surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  background: linear-gradient(
+    104deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.07) 47%,
+    rgba(214, 168, 67, 0.09) 52%,
+    transparent 62%
+  );
+  transition: opacity 420ms ease;
+}
+
+.surface:hover::after {
+  opacity: 1;
+  animation: raimosa-caustic 1.5s ease-out;
+}
+
+.surface:hover {
+  border-color: rgba(214, 195, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(109, 40, 217, 0.3),
+    inset 0 0 40px rgba(139, 92, 246, 0.12),
+    0 28px 70px rgba(3, 1, 9, 0.68),
+    0 0 42px rgba(109, 40, 217, 0.2);
+}
+
+/* --- Chrome as thicker, colder glass --- */
+.topbar,
+.sidenav,
+.ovia {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0) 30%
+    ),
+    rgba(9, 6, 16, 0.62);
+  backdrop-filter: blur(32px) saturate(1.8);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  border-color: var(--lg-edge);
+}
+
+.topbar {
+  box-shadow:
+    inset 0 -1px 0 rgba(167, 139, 250, 0.18),
+    0 18px 50px rgba(3, 1, 9, 0.5);
+}
+
+/* Active nav pill reads as lit glass, not a flat block */
+.sidenav button.active {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(167, 139, 250, 0.26) 0%,
+      rgba(109, 40, 217, 0.08) 62%,
+      transparent 100%
+    ),
+    rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+/* --- Controls: liquid pills --- */
+.primary,
+.secondary,
+.danger,
+.tool-action {
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.primary {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.24) 0%,
+      rgba(255, 255, 255, 0) 46%
+    ),
+    linear-gradient(135deg, #7132cf 0%, #9061f5 52%, #6d28d9 100%);
+  border-color: rgba(199, 180, 255, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    0 10px 26px rgba(109, 40, 217, 0.42);
+}
+
+.secondary,
+.tool-action {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0) 44%
+    ),
+    rgba(16, 13, 26, 0.6);
+  border-color: rgba(186, 178, 200, 0.4);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.secondary:hover:not(:disabled),
+.tool-action:hover:not(:disabled) {
+  border-color: rgba(199, 180, 255, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 26px rgba(109, 40, 217, 0.3);
+}
+
+/* --- Inputs as recessed glass --- */
+input,
+select,
+textarea {
+  border-radius: 11px;
+}
+
+.command {
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0) 40%
+    ),
+    rgba(10, 7, 18, 0.62);
+  border-color: rgba(167, 139, 250, 0.44);
+  box-shadow: inset 0 2px 8px rgba(3, 1, 9, 0.5);
+}
+
+/* --- Ledger toolbar: filter + export --- */
+.ledger-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.ledger-filter {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 0 12px;
+  height: 42px;
+  border-radius: 11px;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  background: rgba(8, 5, 15, 0.55);
+}
+
+.ledger-filter svg {
+  flex: 0 0 auto;
+  color: var(--lav);
+}
+
+.ledger-filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ivory);
+  font-size: 13px;
+}
+
+.ledger-count {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ledger-export {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-left: auto;
+}
+
+.ledger-export button {
+  height: 42px;
+  font-size: 13px;
+}
+
+/* --- Motion opt-out covers the new animations too --- */
+body.reduced-motion-field::before,
+body.reduced-motion-field .surface:hover::after {
+  animation: none !important;
+}

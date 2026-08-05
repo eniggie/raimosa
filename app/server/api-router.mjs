@@ -128,6 +128,10 @@ export function createApiHandler({ getPort, service: injected } = {}) {
         send(res, 200, { ok: true, receipt: await service.scanRuntime() });
         return;
       }
+      if (route === "/receipts/export") {
+        send(res, 200, service.exportLedger(payload));
+        return;
+      }
       if (route === "/stop") {
         send(res, 200, service.emergencyStop());
         return;

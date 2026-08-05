@@ -19,6 +19,8 @@ export const desktopApi = {
   scan: () => request("/scan", {}),
   plan: (command, root) => request("/plan", { command, root }),
   run: (tool, payload = {}) => request(`/tools/${tool}`, payload),
+  exportReceipts: (format, tool) =>
+    request("/receipts/export", { format, tool }),
   emergencyStop: () => request("/stop", {}),
   emergencyClear: () => request("/stop/clear", {}),
   emergencyStatus: () => request("/stop/status", {}),

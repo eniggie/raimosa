@@ -67,6 +67,30 @@ const LEDGER_REDACTORS = {
   }),
 };
 
+// Which catalog capability governs each tool. The catalog decides what is
+// available on THIS platform, and handle() enforces it — otherwise the
+// catalog would only be hiding buttons while the server still executed the
+// adapter for anyone who called the route directly.
+const TOOL_CAPABILITY = {
+  "find-files": "find-files",
+  "summarize-folder": "summarize-folder",
+  "storage-insights": "storage-insights",
+  "find-duplicates": "find-duplicates",
+  "preview-file": "preview-file",
+  "device-vitals": "device-vitals",
+  "plan-organization": "organize-files",
+  "execute-organization": "organize-files",
+  "create-work-product": "create-work-product",
+  "folder-snapshot": "folder-monitor",
+  "list-applications": "applications",
+  "launch-application": "applications",
+  "close-application": "applications",
+  "process-status": "process-status",
+  "agent-runtime-monitor": "agent-runtime-monitor",
+  "local-notification": "local-notification",
+  "open-document": "open-document",
+};
+
 // Installed copies can be launched from any directory, so state must not
 // follow the working directory — otherwise each launch location would grow
 // its own ledger and the receipt history would silently fragment.
@@ -717,18 +741,37 @@ async function closeApplication(payload) {
       timeout: 10_000,
     });
   } else if (process.platform === "win32") {
-    // Ask the window to close; never force-kill, so unsaved work is not lost.
-    await execFileAsync(
+    // A Start Menu shortcut name is not necessarily the process name, so the
+    // result must report how many windows were actually asked to close.
+    // Claiming success when nothing matched would be a false receipt.
+    const { stdout } = await execFileAsync(
       "powershell.exe",
       [
         "-NoProfile",
         "-NonInteractive",
         "-Command",
-        "Get-Process -Name $args[0] -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }",
+        "$p=@(Get-Process -Name $args[0] -ErrorAction SilentlyContinue);" +
+          "$n=0; foreach($x in $p){ if($x.CloseMainWindow()){ $n++ } };" +
+          "Write-Output $n",
         app.name,
       ],
       { timeout: 15_000, windowsHide: true },
     );
+    const asked = Number(String(stdout).trim());
+    if (!Number.isFinite(asked) || asked === 0) {
+      return receipt("close-application", app.path, {
+        application: app.name,
+        windowsAsked: 0,
+        state: "no-matching-window",
+        detail:
+          "No running window matched this application, so nothing was closed. A Start Menu shortcut name can differ from the running process name.",
+      });
+    }
+    return receipt("close-application", app.path, {
+      application: app.name,
+      windowsAsked: asked,
+      state: "quit-request-accepted",
+    });
   } else {
     throw new Error(
       `Quitting applications is not implemented for ${process.platform}.`,
@@ -1561,6 +1604,18 @@ export function createDesktopToolService(options = {}) {
     } else if (CONTROL_TOOLS.has(tool)) {
       requireAccess(effectivePayload.accessToken);
     }
+
+    // The capability registry is the authority, not just a source of UI state.
+    const governing = TOOL_CAPABILITY[tool];
+    const capability = governing
+      ? capabilityCatalog.find((item) => item.id === governing)
+      : null;
+    if (governing && capability?.status !== "available") {
+      throw new Error(
+        `${capability?.title ?? tool} has no verified adapter on ${process.platform}, so it cannot run here.`,
+      );
+    }
+
     let result;
     switch (tool) {
       case "find-files":
@@ -1663,6 +1718,86 @@ export function createDesktopToolService(options = {}) {
     },
     verifyLedger() {
       return ledger.verify();
+    },
+    /**
+     * Export the receipt ledger as verifiable evidence.
+     *
+     * The export always carries the integrity verdict alongside the rows, so
+     * an exported file can never look trustworthy when the chain underneath
+     * it is broken.
+     */
+    exportLedger({ format = "json", tool = "" } = {}) {
+      const integrity = ledger.verify();
+      const all = ledger.list(100);
+      const filter = String(tool ?? "")
+        .trim()
+        .toLowerCase();
+      const rows = filter
+        ? all.filter((entry) => entry.tool.toLowerCase().includes(filter))
+        : all;
+
+      if (format === "csv") {
+        const escape = (value) =>
+          `"${String(value ?? "").replaceAll('"', '""')}"`;
+        const header = [
+          "sequence",
+          "id",
+          "tool",
+          "scope",
+          "timestamp",
+          "verified",
+          "hash",
+          "result",
+        ];
+        const lines = [header.join(",")];
+        for (const entry of [...rows].reverse()) {
+          lines.push(
+            [
+              entry.sequence,
+              escape(entry.id),
+              escape(entry.tool),
+              escape(entry.scope),
+              escape(entry.timestamp),
+              entry.verified,
+              escape(entry.hash),
+              escape(JSON.stringify(entry.result)),
+            ].join(","),
+          );
+        }
+        return {
+          ok: true,
+          format: "csv",
+          filename: `raimosa-receipts-${new Date().toISOString().slice(0, 10)}.csv`,
+          integrity,
+          content: lines.join("\n"),
+        };
+      }
+
+      return {
+        ok: true,
+        format: "json",
+        filename: `raimosa-receipts-${new Date().toISOString().slice(0, 10)}.json`,
+        integrity,
+        content: JSON.stringify(
+          {
+            product: "RAIMOSA AI",
+            exportedAt: new Date().toISOString(),
+            host: os.hostname(),
+            platform: process.platform,
+            ledgerDurable: ledger.durable,
+            totalReceipts: ledger.count(),
+            exportedReceipts: rows.length,
+            filter: filter || null,
+            integrity,
+            attestation: integrity.intact
+              ? "Every exported receipt was verified against an unbroken SHA-256 chain at export time."
+              : `CHAIN BROKEN at ${integrity.brokenAt}. Treat receipts after that point as unverified.`,
+            receipts: [...rows].reverse(),
+          },
+          null,
+          2,
+        ),
+      };
     },
     recovery,
     closeLedger() {

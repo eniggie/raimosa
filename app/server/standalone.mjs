@@ -25,7 +25,20 @@ const MIME = {
 };
 
 async function serveStatic(req, res) {
-  const requested = new URL(req.url ?? "/", "http://localhost").pathname;
+  const raw = new URL(req.url ?? "/", "http://localhost").pathname;
+  // Decode percent-escapes so hashed asset names containing encoded
+  // characters resolve. A malformed escape is treated as a literal path.
+  let requested = raw;
+  try {
+    requested = decodeURIComponent(raw);
+  } catch {
+    requested = raw;
+  }
+  if (requested.includes("\0")) {
+    res.statusCode = 400;
+    res.end("Bad request.");
+    return;
+  }
   // Resolve inside dist and refuse anything that escapes it.
   const candidate = path.resolve(DIST, `.${requested}`);
   const inside =
