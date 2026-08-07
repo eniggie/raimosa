@@ -71,6 +71,25 @@ NOTE
     -ov -format UDZO "$DMG" >/dev/null
   rm -rf "$STAGE"
   say "Built $(basename "$DMG") ($(du -h "$DMG" | cut -f1))"
+
+  # Notarize when credentials exist. The keychain profile is created once with:
+  #   xcrun notarytool store-credentials raimosa-notary \
+  #     --apple-id <apple-id> --team-id W842SR649M
+  if xcrun notarytool history --keychain-profile raimosa-notary \
+      >/dev/null 2>&1; then
+    say "Notarizing (this usually takes a few minutes)…"
+    if xcrun notarytool submit "$DMG" --keychain-profile raimosa-notary \
+        --wait 2>&1 | tee "$OUT/notarization.log" | grep -q "status: Accepted"; then
+      xcrun stapler staple "$DMG" >/dev/null
+      say "Notarized and stapled: double-click install, no Gatekeeper warning."
+    else
+      say "NOTE: notarization was not accepted — see dist-release/notarization.log."
+      say "The DMG still works with right-click > Open."
+    fi
+  else
+    say "NOTE: no 'raimosa-notary' keychain profile; skipping notarization."
+    say "First launch will need right-click > Open."
+  fi
 else
   say "Skipping the macOS disk image (not running on macOS)."
 fi

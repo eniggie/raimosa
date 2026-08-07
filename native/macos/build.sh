@@ -118,9 +118,36 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# 8. Ad-hoc sign so Gatekeeper treats it as a coherent bundle on this machine.
-if command -v codesign >/dev/null 2>&1; then
-  say "Signing (ad-hoc)…"
+# 8. Sign. With a Developer ID identity present, sign properly with the
+#    hardened runtime (required for notarization); otherwise fall back to
+#    ad-hoc so local builds still cohere.
+DEVID="$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+if [ -n "$DEVID" ]; then
+  say "Signing with: $DEVID"
+  ENTITLEMENTS="$OUT/raimosa-entitlements.plist"
+  # Node's V8 JIT needs these two under the hardened runtime; without them a
+  # signed-and-notarized app would crash on launch.
+  cat > "$ENTITLEMENTS" <<'ENT'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key><true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+</dict>
+</plist>
+ENT
+  # Nested executables first, then the bundle.
+  if [ -f "$CONTENTS/Resources/runtime/bin/node" ]; then
+    codesign --force --options runtime --timestamp \
+      --entitlements "$ENTITLEMENTS" --sign "$DEVID" \
+      "$CONTENTS/Resources/runtime/bin/node"
+  fi
+  codesign --force --options runtime --timestamp \
+    --entitlements "$ENTITLEMENTS" --sign "$DEVID" "$APP"
+  say "Verify: $(codesign -dv "$APP" 2>&1 | grep '^Authority=Developer ID' | head -1)"
+elif command -v codesign >/dev/null 2>&1; then
+  say "Signing (ad-hoc — no Developer ID certificate found)…"
   codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || \
     say "Ad-hoc signing failed; the app still runs locally."
 fi
