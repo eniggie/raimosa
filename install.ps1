@@ -53,21 +53,34 @@ Say "Verifying the install..."
 npm test *> $null
 if ($LASTEXITCODE -ne 0) { Fail "The verification suite failed. Nothing was linked." }
 
-# 5. Put `raimosa` on PATH
+# 5. Put `raimosa` on PATH. When npm link cannot write the global prefix,
+#    fall back to a per-user shim in %LOCALAPPDATA% rather than printing
+#    instructions for a command that does not exist.
 npm link *> $null
 if ($LASTEXITCODE -eq 0) {
   Say "Linked the 'raimosa' command."
   $launch = "raimosa"
 } else {
-  Say "Could not link globally. Use the local command instead."
-  $launch = "npm start --prefix `"$AppDir`""
+  $shimDir = Join-Path $env:LOCALAPPDATA 'RAIMOSA\bin'
+  New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
+  $shim = Join-Path $shimDir 'raimosa.cmd'
+  "@echo off`r`nnode `"$AppDir\bin\raimosa.mjs`" %*" | Set-Content -Path $shim -Encoding ASCII
+  $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+  if ($userPath -notlike "*$shimDir*") {
+    [Environment]::SetEnvironmentVariable('Path', "$shimDir;$userPath", 'User')
+    Say "Installed 'raimosa' to $shimDir and added it to your user PATH."
+    Say "Open a NEW terminal for the command to be picked up."
+  } else {
+    Say "Installed 'raimosa' to $shimDir."
+  }
+  $launch = "raimosa"
 }
 
 Write-Host ""
 Write-Host "  RAIMOSA AI is installed."
 Write-Host ""
 Write-Host "    Start it:   $launch"
-Write-Host "    Options:    raimosa --port 5000 --no-open"
+Write-Host "    Options:    $launch --port 5000 --no-open"
 Write-Host ""
 Write-Host "  It runs entirely on this machine. The adapter API answers loopback"
 Write-Host "  requests only, and a paired phone is limited to your local network."

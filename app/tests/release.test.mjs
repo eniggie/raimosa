@@ -52,3 +52,20 @@ test("the release script verifies before it packages and publishes checksums", a
   assert.match(release, /NOT YET VERIFIED ON REAL WINDOWS HARDWARE/);
   assert.match(release, /NOT YET VERIFIED ON REAL LINUX HARDWARE/);
 });
+
+test("installers never print instructions for a command that does not exist", async () => {
+  const sh = await fs.readFile(path.join(repoRoot, "install.sh"), "utf8");
+  // The macOS/Linux installer falls back to a ~/.local/bin symlink and warns
+  // when that directory is not on PATH.
+  assert.match(sh, /\.local\/bin/);
+  assert.match(sh, /not on your PATH/);
+  // The options line must use the resolved launcher, not a hardcoded name.
+  assert.match(sh, /Options:\s+\$LAUNCH/);
+  assert.ok(!sh.includes("Options:    raimosa"));
+
+  const ps = await fs.readFile(path.join(repoRoot, "install.ps1"), "utf8");
+  // The Windows installer falls back to a per-user shim on PATH.
+  assert.match(ps, /LOCALAPPDATA/);
+  assert.match(ps, /raimosa\.cmd/);
+  assert.match(ps, /Options:\s+\$launch/);
+});

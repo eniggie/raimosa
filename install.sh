@@ -49,13 +49,29 @@ npm run build >/dev/null
 say "Verifying the install…"
 npm test >/dev/null 2>&1 || fail "The verification suite failed. Nothing was linked."
 
-# 5. Put `raimosa` on PATH
+# 5. Put `raimosa` on PATH. npm link needs write access to the global prefix,
+#    which stock installs often don't have — so fall back to a plain symlink
+#    in ~/.local/bin rather than printing instructions for a command that
+#    doesn't exist.
+LAUNCH=""
 if npm link >/dev/null 2>&1; then
   say "Linked the 'raimosa' command."
   LAUNCH="raimosa"
 else
-  say "Could not link globally (no permission). Use the local command instead."
-  LAUNCH="npm start --prefix \"$APP_DIR\""
+  mkdir -p "$HOME/.local/bin"
+  ln -sf "$APP_DIR/bin/raimosa.mjs" "$HOME/.local/bin/raimosa"
+  chmod +x "$APP_DIR/bin/raimosa.mjs"
+  say "Installed the 'raimosa' command to ~/.local/bin (no sudo needed)."
+  case ":$PATH:" in
+    *":$HOME/.local/bin:"*) LAUNCH="raimosa" ;;
+    *)
+      LAUNCH="$HOME/.local/bin/raimosa"
+      PROFILE="$HOME/.zshrc"
+      [ -n "${BASH_VERSION:-}" ] && PROFILE="$HOME/.bashrc"
+      say "NOTE: ~/.local/bin is not on your PATH. Add it with:"
+      say "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> $PROFILE"
+      ;;
+  esac
 fi
 
 cat <<EOF
@@ -63,7 +79,7 @@ cat <<EOF
   RAIMOSA AI is installed.
 
     Start it:   $LAUNCH
-    Options:    raimosa --port 5000 --no-open
+    Options:    $LAUNCH --port 5000 --no-open
 
   It runs entirely on this machine. The adapter API answers loopback
   requests only, and a paired phone is limited to your local network.
