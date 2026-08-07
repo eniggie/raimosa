@@ -1,6 +1,23 @@
 # RAIMOSA Product Roadmap
 
-**Status:** Execution baseline  
+> **Status update — August 6, 2026.** This roadmap predates implementation and is
+> kept as the planning record. What has actually shipped since:
+>
+> - **Phase 1 is delivered**, as a web interface plus a **native AppKit shell**
+>   (`RAIMOSA.app`), not the Tauri 2 shell planned below — see
+>   [ADR-002](../decisions/ADR-002-NATIVE-SHELL-SWIFT.md) for why.
+> - **Phase 2's core is delivered in the Node service** rather than a Rust core:
+>   durable append-only hash-chained receipt ledger (SQLite), durable single-use
+>   approvals claimed before execution, crash recovery that revokes rather than
+>   resumes authority, hash-only credential storage, a durable server-side
+>   emergency-stop latch, and 21 platform-gated adapters enforced by the server.
+> - Downloadable releases exist (`./release.sh`): a self-contained universal
+>   macOS `.dmg` with Node bundled, plus Windows/Linux archives.
+> - **Phase 3 (cloud control plane, provider-backed OVIA AI) remains unbuilt.**
+>   The capability catalog reflects this honestly: `model-reasoning` and
+>   `agent-command-bridge` are unavailable with no action controls.
+
+**Status:** Planning record — see the update above for delivery reality  
 **Date:** July 20, 2026  
 **Strategy:** Earn authority through verified, reversible value
 
