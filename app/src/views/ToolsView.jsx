@@ -289,6 +289,16 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
             </button>
           </div>
         )}
+        {!pro && (
+          <a
+            className="license-buy"
+            href="https://eniggie.github.io/raimosa/#pricing"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Don't have a key yet? Get RAIMOSA Pro →
+          </a>
+        )}
         {licenseError && (
           <div className="inline-error" role="alert">
             <Warning />
