@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: ECONTEURLLC.RAIMOSA
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: ECONTEUR LLC
+PublisherUrl: https://github.com/eniggie/raimosa
+PublisherSupportUrl: https://github.com/eniggie/raimosa/issues
+PackageName: RAIMOSA AI
+PackageUrl: https://github.com/eniggie/raimosa
+License: Proprietary
+Copyright: © ECONTEUR LLC
+ShortDescription: A local, governed desktop commander with a tamper-evident receipt ledger.
+Description: |-
+  RAIMOSA AI is a local desktop commander. One assistant plans work, asks for
+  your approval, carries it out through named tools, and writes a tamper-evident
+  receipt for everything it does. It runs entirely on your machine — no cloud
+  account, no telemetry, no external model. The Node runtime is bundled, so
+  nothing needs installing.
+Moniker: raimosa
+Tags:
+  - automation
+  - desktop
+  - productivity
+  - utility
+  - local-ai
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

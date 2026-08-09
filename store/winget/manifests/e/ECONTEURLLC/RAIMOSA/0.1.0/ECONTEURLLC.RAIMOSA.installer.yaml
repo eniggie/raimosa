@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+PackageIdentifier: ECONTEURLLC.RAIMOSA
+PackageVersion: 0.1.0
+InstallerType: zip
+NestedInstallerType: portable
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/eniggie/raimosa/releases/download/v0.1.0/RAIMOSA-0.1.0-windows.zip
+    InstallerSha256: 0162761004AB7E19E1BBE0FE4AFFA98AD43A0766FBE49B34F90757941FBDB4FB
+    NestedInstallerFiles:
+      - RelativeFilePath: RAIMOSA-0.1.0\START-RAIMOSA.cmd
+        PortableCommandAlias: raimosa
+ManifestType: installer
+ManifestVersion: 1.6.0
