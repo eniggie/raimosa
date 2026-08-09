@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAIMOSA AI — a local, governed desktop commander</title>
+    <meta
+      name="description"
+      content="RAIMOSA AI does real work on your computer and writes a tamper-evident receipt for everything it does. Runs entirely on your machine — no cloud, no accounts, no telemetry."
+    />
+    <link rel="icon" href="raimosa-icon.png" />
+    <meta property="og:title" content="RAIMOSA AI" />
+    <meta
+      property="og:description"
+      content="A local, governed desktop commander. It does the work — and hands you the receipts."
+    />
+    <meta property="og:image" content="raimosa-icon.png" />
+    <style>
+      :root {
+        --black: #07030d;
+        --panel: rgba(255, 255, 255, 0.04);
+        --line: rgba(255, 255, 255, 0.1);
+        --lit: rgba(190, 168, 255, 0.4);
+        --purple: #6d28d9;
+        --violet: #8b5cf6;
+        --lav: #a78bfa;
+        --gold: #d6a843;
+        --gold2: #f6d782;
+        --ivory: #f8f3e7;
+        --muted: #a49dae;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        font-family:
+          Inter,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        color: var(--ivory);
+        background:
+          radial-gradient(
+            1200px 760px at 78% -12%,
+            #1a0c30 0%,
+            transparent 62%
+          ),
+          radial-gradient(900px 620px at -8% 30%, #120a1f 0%, transparent 58%),
+          var(--black);
+        background-attachment: fixed;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: var(--lav);
+        text-decoration: none;
+      }
+      .wrap {
+        max-width: 1060px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 22px 24px;
+        max-width: 1060px;
+        margin: 0 auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .brand img {
+        width: 44px;
+        height: 44px;
+      }
+      .brand b {
+        font:
+          700 17px/1 Montserrat,
+          sans-serif;
+        letter-spacing: 0.22em;
+      }
+      .nav a {
+        color: var(--muted);
+        margin-left: 22px;
+        font-size: 14px;
+      }
+      .nav a:hover {
+        color: var(--ivory);
+      }
+      .hero {
+        text-align: center;
+        padding: 70px 0 40px;
+      }
+      .hero h1 {
+        font:
+          600 clamp(34px, 6vw, 60px) / 1.05 Montserrat,
+          sans-serif;
+        letter-spacing: -0.03em;
+        margin: 0 0 18px;
+        background: linear-gradient(
+          100deg,
+          var(--ivory) 30%,
+          var(--gold2) 78%,
+          var(--gold)
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .hero p.lede {
+        font-size: clamp(17px, 2.4vw, 21px);
+        color: #cfc9d8;
+        max-width: 680px;
+        margin: 0 auto 12px;
+      }
+      .hero p.sub {
+        color: var(--muted);
+        max-width: 620px;
+        margin: 0 auto 30px;
+      }
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        height: 52px;
+        padding: 0 26px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 15px;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+      .cta.primary {
+        background: linear-gradient(135deg, #7132cf, #8b5cf6 55%, #6d28d9);
+        color: #fff;
+        border-color: rgba(167, 139, 250, 0.7);
+        box-shadow: 0 10px 30px rgba(109, 40, 217, 0.4);
+      }
+      .cta.ghost {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--ivory);
+        border-color: var(--line);
+      }
+      .cta:hover {
+        transform: translateY(-1px);
+      }
+      .cta-row {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .tag {
+        display: inline-block;
+        margin-bottom: 22px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--gold2);
+        font:
+          600 11px Montserrat,
+          sans-serif;
+        letter-spacing: 0.16em;
+      }
+      section {
+        padding: 56px 0;
+      }
+      h2.section {
+        font:
+          600 clamp(26px, 4vw, 36px) / 1.1 Montserrat,
+          sans-serif;
+        letter-spacing: -0.02em;
+        text-align: center;
+        margin: 0 0 12px;
+      }
+      p.section-sub {
+        text-align: center;
+        color: var(--muted);
+        max-width: 640px;
+        margin: 0 auto 40px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 18px;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--panel);
+        padding: 24px;
+        backdrop-filter: blur(16px);
+      }
+      .card h3 {
+        margin: 0 0 8px;
+        font:
+          600 18px Montserrat,
+          sans-serif;
+      }
+      .card p {
+        color: var(--muted);
+        font-size: 14.5px;
+        margin: 0;
+      }
+      .card .ic {
+        font-size: 22px;
+        margin-bottom: 12px;
+      }
+      /* Downloads */
+      .dl-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 18px;
+      }
+      .dl {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--panel);
+        padding: 22px;
+      }
+      .dl h3 {
+        margin: 0 0 4px;
+        font:
+          600 18px Montserrat,
+          sans-serif;
+      }
+      .dl .note {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 14px;
+      }
+      .dl a.btn {
+        display: inline-block;
+        margin: 0 8px 8px 0;
+        padding: 9px 16px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--ivory);
+        font-size: 13.5px;
+        font-weight: 500;
+      }
+      .dl a.btn:hover {
+        border-color: var(--lit);
+      }
+      code.cmd {
+        display: block;
+        margin-top: 8px;
+        padding: 10px 12px;
+        border-radius: 9px;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid var(--line);
+        color: #d9d2e6;
+        font:
+          500 12.5px "SF Mono", ui-monospace, monospace;
+        overflow-x: auto;
+      }
+      /* Pricing */
+      .price-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        max-width: 780px;
+        margin: 0 auto;
+      }
+      .plan {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--panel);
+        padding: 28px;
+      }
+      .plan.pro {
+        border-color: rgba(214, 168, 67, 0.4);
+        background:
+          linear-gradient(180deg, rgba(214, 168, 67, 0.06), transparent 40%),
+          var(--panel);
+      }
+      .plan h3 {
+        font:
+          600 20px Montserrat,
+          sans-serif;
+        margin: 0 0 4px;
+      }
+      .plan .amt {
+        font:
+          600 34px Montserrat,
+          sans-serif;
+        margin: 6px 0 2px;
+      }
+      .plan .amt small {
+        font-size: 15px;
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .plan .was {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 16px;
+      }
+      .plan ul {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 22px;
+      }
+      .plan li {
+        padding: 6px 0 6px 26px;
+        position: relative;
+        color: #d6d0dd;
+        font-size: 14.5px;
+      }
+      .plan li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: var(--gold2);
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font:
+          700 10px Montserrat,
+          sans-serif;
+        letter-spacing: 0.14em;
+        color: #0b0711;
+        background: linear-gradient(120deg, var(--gold2), var(--gold));
+        margin-left: 8px;
+        vertical-align: middle;
+      }
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 32px 0;
+        color: var(--muted);
+        font-size: 13.5px;
+        text-align: center;
+      }
+      footer a {
+        color: var(--muted);
+        margin: 0 10px;
+      }
+      .trust-note {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 28px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <img src="raimosa-emblem.png" alt="RAIMOSA" />
+        <b>RAIMOSA AI</b>
+      </div>
+      <nav class="nav">
+        <a href="#downloads">Download</a>
+        <a href="#pricing">Pricing</a>
+        <a href="https://github.com/eniggie/raimosa">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="wrap">
+      <div class="hero">
+        <span class="tag">LOCAL · GOVERNED · VERIFIABLE</span>
+        <h1>It does the work — and hands you the receipts.</h1>
+        <p class="lede">
+          RAIMOSA AI is a local desktop commander. It finds, organizes, and acts
+          on your computer through tools you approve — and writes a
+          tamper-evident receipt for every single thing it does.
+        </p>
+        <p class="sub">
+          Runs entirely on your machine. No cloud account. No telemetry. No
+          external model. What RAIMOSA did is never a matter of trust — it's
+          evidence you hold.
+        </p>
+        <div class="cta-row">
+          <a class="cta primary" href="#downloads">Download free</a>
+          <a class="cta ghost" href="#pricing">See Pro</a>
+        </div>
+        <p class="trust-note">
+          Free forever · macOS, Windows &amp; Linux · open the app and every
+          action is signed into a ledger you can read and export.
+        </p>
+      </div>
+
+      <section id="why">
+        <h2 class="section">Most assistants ask you to trust them.</h2>
+        <p class="section-sub">
+          RAIMOSA proves itself instead. Every tool it runs is recorded in an
+          append-only, hash-chained ledger. Alter, delete, or reorder one
+          receipt and the chain breaks — and the app tells you.
+        </p>
+        <div class="grid">
+          <div class="card">
+            <div class="ic">🧾</div>
+            <h3>Tamper-evident ledger</h3>
+            <p>
+              Every action writes a hash-chained receipt. Export it to JSON or
+              CSV with a live integrity attestation. Evidence, not a log.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ic">✋</div>
+            <h3>Approval before action</h3>
+            <p>
+              File moves need an exact plan plus a one-time confirmation. Writes
+              never overwrite. Nothing is ever deleted.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ic">🛑</div>
+            <h3>Real emergency stop</h3>
+            <p>
+              A durable server-side latch that blocks every tool until you clear
+              it — and survives a restart. Not a button that lies.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ic">🔒</div>
+            <h3>Loopback only</h3>
+            <p>
+              The engine answers requests from your computer alone. A paired
+              phone is limited to your local network and a session you revoke.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ic">🕵️</div>
+            <h3>Your data stays yours</h3>
+            <p>
+              File contents are never written to the ledger — only paths, sizes,
+              and hashes. Credentials are stored only as hashes.
+            </p>
+          </div>
+          <div class="card">
+            <div class="ic">⚡</div>
+            <h3>Nothing to install</h3>
+            <p>
+              The Node runtime is bundled. On macOS the app is signed and
+              notarized by Apple — download, double-click, done.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="downloads">
+        <h2 class="section">Download</h2>
+        <p class="section-sub">
+          Free on every platform. Self-contained — nothing else to install.
+          Verify any download against
+          <a
+            href="https://github.com/eniggie/raimosa/releases/latest"
+            >SHA256SUMS</a
+          >.
+        </p>
+        <div class="dl-grid">
+          <div class="dl">
+            <h3>macOS</h3>
+            <p class="note">Apple Silicon + Intel · signed &amp; notarized</p>
+            <a
+              class="btn"
+              href="https://github.com/eniggie/raimosa/releases/latest/download/RAIMOSA-0.1.0-macOS.dmg"
+              >Download .dmg</a
+            >
+            <code class="cmd">brew install --cask eniggie/raimosa/raimosa</code>
+          </div>
+          <div class="dl">
+            <h3>Windows</h3>
+            <p class="note">x64 + arm64 · Node bundled</p>
+            <a
+              class="btn"
+              href="https://github.com/eniggie/raimosa/releases/latest/download/RAIMOSA-0.1.0-windows.zip"
+              >Download .zip</a
+            >
+            <code class="cmd">Unzip → right-click START-RAIMOSA.cmd → Run</code>
+          </div>
+          <div class="dl">
+            <h3>Linux</h3>
+            <p class="note">x64 + arm64 · Node bundled</p>
+            <a
+              class="btn"
+              href="https://github.com/eniggie/raimosa/releases/latest/download/RAIMOSA-0.1.0-linux.tar.gz"
+              >Download .tar.gz</a
+            >
+            <code class="cmd">./native/linux/install-desktop.sh</code>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing">
+        <h2 class="section">Simple pricing</h2>
+        <p class="section-sub">
+          The governed loop and the ledger are free forever. Pro unlocks the
+          tools that command the machine itself.
+        </p>
+        <div class="price-grid">
+          <div class="plan">
+            <h3>Free</h3>
+            <div class="amt">$0</div>
+            <div class="was">Forever</div>
+            <ul>
+              <li>Find, summarize, storage insights, duplicates, preview</li>
+              <li>The full organize → approve → execute → verify loop</li>
+              <li>Device vitals, network, process &amp; folder monitoring</li>
+              <li>Create documents, spreadsheets, presentations</li>
+              <li>The tamper-evident receipt ledger + export</li>
+            </ul>
+            <a class="cta ghost" href="#downloads">Download free</a>
+          </div>
+          <div class="plan pro">
+            <h3>Pro <span class="badge">POWER</span></h3>
+            <div class="amt">
+              $29 <small>one-time</small>
+            </div>
+            <div class="was">Launch price · $39 after</div>
+            <ul>
+              <li>Everything in Free</li>
+              <li>Launch &amp; quit applications, open documents</li>
+              <li>Read &amp; write the clipboard</li>
+              <li>Capture the screen</li>
+              <li>Sleep, restart, shut down</li>
+              <li>Pair a phone as a mobile remote</li>
+            </ul>
+            <a class="cta primary" href="mailto:support@raimzy.com?subject=RAIMOSA%20Pro%20license"
+              >Get Pro</a
+            >
+          </div>
+        </div>
+        <p class="trust-note">
+          A Pro license is an offline, cryptographically-signed key. No account,
+          no subscription, no phone-home — you activate it once inside the app.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <a href="https://github.com/eniggie/raimosa">GitHub</a>
+        <a href="https://github.com/eniggie/raimosa/releases">Releases</a>
+        <a
+          href="https://github.com/eniggie/raimosa/blob/main/store/windows/PRIVACY.md"
+          >Privacy</a
+        >
+        <div style="margin-top: 14px">© ECONTEUR LLC · RAIMOSA AI</div>
+      </div>
+    </footer>
+  </body>
+</html>
