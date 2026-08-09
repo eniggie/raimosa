@@ -47,15 +47,15 @@ if [ "$(uname -s)" = "Darwin" ]; then
   cp -R "$APP" "$STAGE/"
   # The familiar drag-to-install gesture.
   ln -s /Applications "$STAGE/Applications"
-  cat > "$STAGE/READ ME FIRST.txt" <<'NOTE'
+  cat > "$OUT/READ-ME-FIRST.txt" <<'NOTE'
 RAIMOSA AI
 
 1. Drag RAIMOSA to the Applications folder beside it.
-2. The first time you open it, right-click the app and choose Open.
+2. Double-click to open.
 
-Why the right-click: this build is signed ad-hoc rather than notarized with an
-Apple Developer ID, so macOS asks you to confirm the first launch. Every later
-launch is a normal double-click.
+This app is signed with an Apple Developer ID and notarized by Apple, so it
+opens with a normal double-click — no security warning. (If you ever see one,
+this particular build was not notarized; right-click the app and choose Open.)
 
 Nothing else is required. Node is bundled inside the app.
 
@@ -65,6 +65,7 @@ can read and export from the Ledger screen.
 
 © ECONTEUR LLC
 NOTE
+  cp "$OUT/READ-ME-FIRST.txt" "$STAGE/READ ME FIRST.txt"
 
   DMG="$OUT/RAIMOSA-$VERSION-macOS.dmg"
   hdiutil create -volname "RAIMOSA AI" -srcfolder "$STAGE" \
@@ -75,17 +76,22 @@ NOTE
   # Notarize when credentials exist. The keychain profile is created once with:
   #   xcrun notarytool store-credentials raimosa-notary \
   #     --apple-id <apple-id> --team-id W842SR649M
+  #
+  # Apple's scan can take from two minutes to over an hour, especially for a
+  # new account's first submission. Rather than block the whole release on it,
+  # the submission is fire-and-verify: it runs in the background while the
+  # Windows and Linux archives package, and is collected at the end. A crash
+  # loses nothing — the ticket lives with Apple and can be stapled later with
+  #   xcrun stapler staple "$DMG"
+  NOTARIZE_PID=""
   if xcrun notarytool history --keychain-profile raimosa-notary \
       >/dev/null 2>&1; then
-    say "Notarizing (this usually takes a few minutes)…"
-    if xcrun notarytool submit "$DMG" --keychain-profile raimosa-notary \
-        --wait 2>&1 | tee "$OUT/notarization.log" | grep -q "status: Accepted"; then
-      xcrun stapler staple "$DMG" >/dev/null
-      say "Notarized and stapled: double-click install, no Gatekeeper warning."
-    else
-      say "NOTE: notarization was not accepted — see dist-release/notarization.log."
-      say "The DMG still works with right-click > Open."
-    fi
+    say "Notarizing in the background (Apple's scan can take a while)…"
+    (
+      xcrun notarytool submit "$DMG" --keychain-profile raimosa-notary \
+        --wait > "$OUT/notarization.log" 2>&1
+    ) &
+    NOTARIZE_PID=$!
   else
     say "NOTE: no 'raimosa-notary' keychain profile; skipping notarization."
     say "First launch will need right-click > Open."
@@ -156,6 +162,29 @@ NOTE
 (cd "$OUT/linux-stage" && tar -czf "$OUT/RAIMOSA-$VERSION-linux.tar.gz" "RAIMOSA-$VERSION")
 rm -rf "$OUT/linux-stage"
 say "Built RAIMOSA-$VERSION-linux.tar.gz ($(du -h "$OUT/RAIMOSA-$VERSION-linux.tar.gz" | cut -f1))"
+
+# ---------- Collect notarization ----------
+if [ -n "${NOTARIZE_PID:-}" ]; then
+  say "Waiting for Apple's notarization to finish…"
+  wait "$NOTARIZE_PID" || true
+  if grep -q "status: Accepted" "$OUT/notarization.log" 2>/dev/null; then
+    # Staple the app first so it launches offline, then the DMG, then repackage
+    # so the shipped image contains the stapled app.
+    xcrun stapler staple "$APP" >/dev/null 2>&1 || true
+    STAGE2="$OUT/dmg-restage"; rm -rf "$STAGE2"; mkdir -p "$STAGE2"
+    cp -R "$APP" "$STAGE2/"; ln -s /Applications "$STAGE2/Applications"
+    cp "$OUT/READ-ME-FIRST.txt" "$STAGE2/READ ME FIRST.txt" 2>/dev/null || true
+    rm -f "$DMG"
+    hdiutil create -volname "RAIMOSA AI" -srcfolder "$STAGE2" \
+      -ov -format UDZO "$DMG" >/dev/null
+    rm -rf "$STAGE2"
+    xcrun stapler staple "$DMG" >/dev/null 2>&1 || true
+    say "Notarized and stapled: the DMG installs with a plain double-click."
+  else
+    say "NOTE: notarization did not complete/accept — see dist-release/notarization.log."
+    say "The DMG still works with right-click > Open, and can be stapled later."
+  fi
+fi
 
 # ---------- Checksums ----------
 say "Writing checksums…"

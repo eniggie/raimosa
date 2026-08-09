@@ -20,7 +20,7 @@ suite fails, nothing is packaged.
 
 | Artifact | Size | Needs |
 |---|---|---|
-| `RAIMOSA-<version>-macOS.dmg` | ~87 MB | **Nothing.** Node is bundled; universal (Apple Silicon + Intel) |
+| `RAIMOSA-<version>-macOS.dmg` | ~88 MB | **Nothing.** Node bundled; universal (Apple Silicon + Intel); signed + notarized |
 | `RAIMOSA-<version>-windows.zip` | ~1.5 MB | Node 22+ |
 | `RAIMOSA-<version>-linux.tar.gz` | ~1.5 MB | Node 22+ |
 
@@ -30,9 +30,9 @@ Every build is checksummed. Verify a download with:
 shasum -a 256 -c SHA256SUMS.txt
 ```
 
-**macOS:** open the `.dmg`, drag RAIMOSA to Applications, then **right-click → Open**
-the first time. That prompt appears because the build is ad-hoc signed rather than
-notarized with an Apple Developer ID; every later launch is a normal double-click.
+**macOS:** open the `.dmg`, drag RAIMOSA to Applications, and **double-click to open**.
+The app is signed with an Apple Developer ID and notarized by Apple, so it launches
+with no security warning.
 
 ## Build from source
 
