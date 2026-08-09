@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDesktopToolService } from "../server/desktop-tools.mjs";
+import { proKey } from "./helpers.mjs";
 
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "raimosa-tools-"));
@@ -119,6 +120,7 @@ test("file organization is exact, approval-bound, reversible in design, and dele
 
 test("mobile remote pairing inherits only the active revocable desktop session", async (t) => {
   const service = createDesktopToolService({ ledgerFile: ":memory:" });
+  service.activateLicense({ key: proKey() });
   const root = await fixture(t);
   const access = service.startAccess({
     duration: 300,
@@ -180,6 +182,7 @@ test("live health scans and every adapter call appear in the runtime ledger", as
 
 test("authority receipts are logged without access or pairing secrets", () => {
   const service = createDesktopToolService({ ledgerFile: ":memory:" });
+  service.activateLicense({ key: proKey() });
   const access = service.startAccess({
     duration: 300,
     confirmed: true,

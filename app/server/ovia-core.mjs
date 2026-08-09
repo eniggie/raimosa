@@ -100,6 +100,7 @@ export const capabilityCatalog = [
   },
   {
     id: "applications",
+    pro: true,
     title: "Open and close supported applications",
     status: desktopStatus({
       darwin: true,
@@ -154,6 +155,7 @@ export const capabilityCatalog = [
   },
   {
     id: "open-document",
+    pro: true,
     title: "Open a document",
     status: desktopStatus({ darwin: true, linux: true, win32: true }),
     risk: "application-control",
@@ -184,6 +186,7 @@ export const capabilityCatalog = [
   },
   {
     id: "clipboard",
+    pro: true,
     title: "Read and write the clipboard",
     status: desktopStatus({ darwin: true, linux: true, win32: true }),
     risk: "sensitive-read",
@@ -197,6 +200,7 @@ export const capabilityCatalog = [
   },
   {
     id: "screen-capture",
+    pro: true,
     title: "Capture the screen",
     status: desktopStatus({ darwin: true }),
     risk: "sensitive-read",
@@ -206,6 +210,7 @@ export const capabilityCatalog = [
   },
   {
     id: "system-power",
+    pro: true,
     title: "Sleep, restart, or shut down",
     status: desktopStatus({ darwin: true, linux: true, win32: true }),
     risk: "high-impact",
@@ -219,6 +224,7 @@ export const capabilityCatalog = [
   },
   {
     id: "mobile-remote",
+    pro: true,
     title: "Use a phone as a desktop remote",
     status: "available",
     risk: "paired-control",

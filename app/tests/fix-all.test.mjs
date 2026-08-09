@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDesktopToolService } from "../server/desktop-tools.mjs";
 import { capabilityCatalog } from "../server/ovia-core.mjs";
+import { proKey } from "./helpers.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -12,8 +13,17 @@ const repoRoot = path.resolve(
   "..",
 );
 
-test("reading the clipboard requires All Access, like every other unscoped read", async () => {
+test("reading the clipboard requires Pro, then All Access", async () => {
   const service = createDesktopToolService({ ledgerFile: ":memory:" });
+  // On Free the clipboard is Pro-gated first.
+  await assert.rejects(
+    service.handle("read-clipboard", {}),
+    /RAIMOSA Pro/,
+    "clipboard is a Pro tool",
+  );
+  // With Pro, it still requires All Access — the clipboard has no folder scope
+  // and routinely holds credentials.
+  service.activateLicense({ key: proKey() });
   await assert.rejects(
     service.handle("read-clipboard", {}),
     /All Access/,

@@ -3732,3 +3732,119 @@ summary:focus-visible {
 .native-macos .topbar {
   padding-left: 78px;
 }
+
+/* ---------- Licensing: Pro badges, gates, activation ---------- */
+
+.pro-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font:
+    700 9px Montserrat,
+    sans-serif;
+  letter-spacing: 0.14em;
+  color: #0b0711;
+  background: linear-gradient(120deg, var(--gold2), var(--gold));
+  box-shadow: 0 0 14px rgba(214, 168, 67, 0.3);
+}
+
+.live-tool.tool-locked {
+  opacity: 0.96;
+}
+
+.tool-pro-gate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: var(--r-md);
+  border: 1px dashed rgba(214, 168, 67, 0.4);
+  background:
+    linear-gradient(180deg, rgba(214, 168, 67, 0.06), transparent 60%),
+    rgba(0, 0, 0, 0.24);
+}
+
+.tool-pro-gate svg {
+  flex: 0 0 auto;
+  color: var(--gold2);
+}
+
+.tool-pro-gate span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.tool-pro-gate strong {
+  font-size: 14px;
+}
+
+.tool-pro-gate small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tool-pro-gate button {
+  flex: 0 0 auto;
+  height: 40px;
+}
+
+.license-card {
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.license-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.license-head svg {
+  flex: 0 0 auto;
+  color: var(--gold2);
+  margin-top: 2px;
+}
+
+.license-head strong {
+  display: block;
+  font:
+    600 16px Montserrat,
+    sans-serif;
+}
+
+.license-head small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.license-activate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.license-activate input {
+  flex: 1 1 260px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hairline);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--ivory);
+  font:
+    500 13px "SF Mono",
+    ui-monospace,
+    monospace;
+}
+
+.license-activate button {
+  height: 44px;
+}

@@ -132,6 +132,18 @@ export function createApiHandler({ getPort, service: injected } = {}) {
         send(res, 200, service.exportLedger(payload));
         return;
       }
+      if (route === "/license/status") {
+        send(res, 200, service.licenseStatus());
+        return;
+      }
+      if (route === "/license/activate") {
+        send(res, 200, service.activateLicense(payload));
+        return;
+      }
+      if (route === "/license/remove") {
+        send(res, 200, service.removeLicense());
+        return;
+      }
       if (route === "/stop") {
         send(res, 200, service.emergencyStop());
         return;

@@ -9,6 +9,8 @@ import {
   EyeIcon as Eye,
   PlayIcon as Play,
   PowerIcon as Power,
+  LockKeyIcon as LockKey,
+  StarIcon as Star,
   ShieldCheckIcon as ShieldCheck,
   StopIcon as Stop,
   WarningIcon as Warning,
@@ -16,18 +18,43 @@ import {
 } from "@phosphor-icons/react";
 import { desktopApi } from "../desktop-api";
 
-function ToolSection({ icon: Icon, eyebrow, title, description, children }) {
+function ToolSection({
+  icon: Icon,
+  eyebrow,
+  title,
+  description,
+  pro = false,
+  locked = false,
+  onUnlock,
+  children,
+}) {
   return (
-    <section className="surface live-tool">
+    <section className={`surface live-tool${locked ? " tool-locked" : ""}`}>
       <header>
         <div>
           <Icon size={24} />
           <span>{eyebrow}</span>
+          {pro && <span className="pro-badge">PRO</span>}
         </div>
         <h2>{title}</h2>
         <p>{description}</p>
       </header>
-      {children}
+      {locked ? (
+        <div className="tool-pro-gate">
+          <LockKey />
+          <span>
+            <strong>RAIMOSA Pro</strong>
+            <small>
+              Unlock the desktop-commander tools with a Pro license.
+            </small>
+          </span>
+          <button type="button" className="primary" onClick={onUnlock}>
+            Unlock Pro
+          </button>
+        </div>
+      ) : (
+        children
+      )}
     </section>
   );
 }
@@ -92,6 +119,10 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
   const [captureName, setCaptureName] = useState("raimosa-capture");
   const [powerAction, setPowerAction] = useState("display-sleep");
   const [powerConfirm, setPowerConfirm] = useState("");
+  const [licenseKey, setLicenseKey] = useState("");
+  const [licenseBusy, setLicenseBusy] = useState(false);
+  const [licenseError, setLicenseError] = useState("");
+  const pro = health?.license?.pro === true;
 
   useEffect(() => {
     let current = true;
@@ -139,6 +170,31 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
     } finally {
       setBusy("");
     }
+  }
+
+  async function activateLicense() {
+    setLicenseBusy(true);
+    setLicenseError("");
+    try {
+      const data = await desktopApi.activateLicense(licenseKey.trim());
+      if (!data.pro)
+        throw new Error(data.error || "That key did not unlock Pro.");
+      const fresh = await desktopApi.health();
+      setHealth(fresh);
+      setLicenseKey("");
+      onAnnouncement?.(`RAIMOSA Pro activated for ${data.holder}.`);
+    } catch (activateError) {
+      setLicenseError(activateError.message);
+    } finally {
+      setLicenseBusy(false);
+    }
+  }
+
+  function focusLicense() {
+    document
+      .getElementById("raimosa-license-card")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("raimosa-license-input")?.focus();
   }
 
   function runRootTool(tool, extra = {}, after) {
@@ -201,6 +257,45 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
           </p>
         </div>
       </div>
+
+      <section id="raimosa-license-card" className="surface license-card">
+        <div className="license-head">
+          <Star size={22} weight={pro ? "fill" : "regular"} />
+          <div>
+            <strong>{pro ? "RAIMOSA Pro" : "RAIMOSA Free"}</strong>
+            <small>
+              {pro
+                ? `Pro unlocked${health?.license?.holder ? ` · ${health.license.holder}` : ""} — every desktop-commander tool is available.`
+                : "The governed loop and the ledger are free forever. Pro unlocks the desktop-commander tools: app control, clipboard, screen capture, power, and mobile remote."}
+            </small>
+          </div>
+        </div>
+        {!pro && (
+          <div className="license-activate">
+            <input
+              id="raimosa-license-input"
+              value={licenseKey}
+              onChange={(event) => setLicenseKey(event.target.value)}
+              placeholder="Paste your RAIMOSA-… license key"
+              aria-label="License key"
+            />
+            <button
+              type="button"
+              className="primary"
+              disabled={licenseBusy || !licenseKey.trim()}
+              onClick={activateLicense}
+            >
+              {licenseBusy ? "Activating…" : "Activate Pro"}
+            </button>
+          </div>
+        )}
+        {licenseError && (
+          <div className="inline-error" role="alert">
+            <Warning />
+            {licenseError}
+          </div>
+        )}
+      </section>
 
       <section className="scope-bar surface">
         <ShieldCheck size={24} />
@@ -554,6 +649,9 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
           <ToolSection
             icon={Play}
             eyebrow="VERIFIED MACOS APPS"
+            pro
+            locked={!pro}
+            onUnlock={focusLicense}
             title="Applications and documents"
             description="Discover installed applications first. Launch and quit apply only to the exact selected application."
           >
@@ -678,6 +776,9 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
           <ToolSection
             icon={NotePencil}
             eyebrow="CLIPBOARD"
+            pro
+            locked={!pro}
+            onUnlock={focusLicense}
             title="Read and write the clipboard"
             description="Read what is on the clipboard now, or replace it with exact text. The clipboard has no folder scope, so reads are gated too. Contents are never written to the ledger."
           >
@@ -715,6 +816,9 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
           <ToolSection
             icon={Eye}
             eyebrow="SENSITIVE READ"
+            pro
+            locked={!pro}
+            onUnlock={focusLicense}
             title="Capture the screen"
             description="Write one full-screen capture into the approved folder and verify the image. Existing files are never replaced."
           >
@@ -744,6 +848,9 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
           <ToolSection
             icon={Power}
             eyebrow="HIGH IMPACT · STEP-UP REQUIRED"
+            pro
+            locked={!pro}
+            onUnlock={focusLicense}
             title="Sleep, restart, or shut down"
             description="Sleep takes effect immediately. Restart and shut down end every running session, so they also require a typed confirmation."
           >

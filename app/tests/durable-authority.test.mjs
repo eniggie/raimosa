@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { createDesktopToolService } from "../server/desktop-tools.mjs";
 import { createStateStore } from "../server/state-store.mjs";
+import { proKey } from "./helpers.mjs";
 
 async function workspace(name) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), `raimosa-${name}-`));
@@ -141,6 +142,8 @@ test("a paired mobile remote dies with the runtime that authorised it", async ()
   const paths = await workspace("remote-restart");
 
   const first = open(paths);
+
+  first.activateLicense({ key: proKey() });
   const access = first.startAccess({ duration: 900, confirmed: true });
   const pairing = first.startRemotePairing({
     accessToken: access.session.token,
@@ -163,6 +166,8 @@ test("the durable state file never stores a usable credential", async () => {
   const paths = await workspace("no-secrets");
 
   const service = open(paths);
+
+  service.activateLicense({ key: proKey() });
   const access = service.startAccess({ duration: 900, confirmed: true });
   const pairing = service.startRemotePairing({
     accessToken: access.session.token,

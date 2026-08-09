@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDesktopToolService } from "../server/desktop-tools.mjs";
 import { capabilityCatalog } from "../server/ovia-core.mjs";
+import { proKey } from "./helpers.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -60,6 +61,7 @@ test("clipboard contents never reach the permanent ledger", async (t) => {
   if (process.platform !== "darwin")
     return t.skip("clipboard adapter is macOS here");
   const service = open();
+  service.activateLicense({ key: proKey() });
   const secret = "sk-live-CLIPBOARD-SECRET-42";
   const access = service.startAccess({ duration: 300, confirmed: true });
   const written = await service.handle("write-clipboard", {
@@ -87,6 +89,7 @@ test("clipboard contents never reach the permanent ledger", async (t) => {
 
 test("high-impact power actions require a typed confirmation", async () => {
   const service = open();
+  service.activateLicense({ key: proKey() });
   const access = service.startAccess({ duration: 300, confirmed: true });
   for (const action of ["restart", "shutdown"]) {
     await assert.rejects(
@@ -125,6 +128,7 @@ test("screen capture refuses to overwrite and requires All Access", async () => 
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "raimosa-shot-"));
   await fs.writeFile(path.join(root, "taken.png"), "not really a png");
   const service = open();
+  service.activateLicense({ key: proKey() });
   await assert.rejects(
     service.handle("capture-screen", { root, name: "x" }),
     /All Access/,

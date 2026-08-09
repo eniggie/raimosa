@@ -8,6 +8,12 @@ import dns from "node:dns/promises";
 import { capabilityCatalog, oviaDoctrine, planCommand } from "./ovia-core.mjs";
 import { createLedger } from "./ledger.mjs";
 import { createStateStore } from "./state-store.mjs";
+import {
+  verifyLicenseKey,
+  requiresPro,
+  PRO_TOOLS,
+  PRO_FEATURES,
+} from "./licensing.mjs";
 
 const execFileAsync = promisify(execFile);
 const TEXT_EXTENSIONS = new Set([
@@ -1304,6 +1310,53 @@ export function createDesktopToolService(options = {}) {
 
   const recovery = recoverInterruptedAuthority();
 
+  // Licensing. RAIMOSA Free is the full governed loop; Pro unlocks the tools
+  // that command the machine. The license is a signed token (not a secret),
+  // stored durably and verified offline on every check, so a tampered flag
+  // cannot grant Pro.
+  function licenseStatus() {
+    const stored = state.getFlag("license");
+    if (!stored?.key) return { tier: "free", pro: false };
+    const check = verifyLicenseKey(stored.key);
+    if (!check.valid) return { tier: "free", pro: false, error: check.reason };
+    return {
+      tier: "pro",
+      pro: true,
+      holder: check.holder,
+      issuedAt: check.issuedAt,
+    };
+  }
+
+  function activateLicense(payload = {}) {
+    const check = verifyLicenseKey(payload.key);
+    if (!check.valid) throw new Error(check.reason);
+    state.setFlag("license", { key: String(payload.key).trim() });
+    record(
+      receipt("license-activated", "RAIMOSA licensing", {
+        tier: check.tier,
+        holder: check.holder,
+        issuedAt: check.issuedAt,
+      }),
+    );
+    return { ok: true, ...licenseStatus() };
+  }
+
+  function removeLicense() {
+    const was = licenseStatus();
+    state.clearFlag("license");
+    if (was.pro)
+      record(receipt("license-removed", "RAIMOSA licensing", { tier: "free" }));
+    return { ok: true, ...licenseStatus() };
+  }
+
+  function requirePro(name) {
+    if (!requiresPro(name)) return;
+    if (!licenseStatus().pro)
+      throw new Error(
+        "This is a RAIMOSA Pro tool. Activate a Pro license to unlock the desktop-commander tools (app control, clipboard, screen capture, power, and mobile remote).",
+      );
+  }
+
   // Emergency stop is a durable server-side latch, not a UI state. While
   // latched, every adapter dispatch, All Access grant, and pairing action is
   // refused at the server, and the latch survives a runtime restart until the
@@ -1470,6 +1523,7 @@ export function createDesktopToolService(options = {}) {
 
   function startRemotePairing(payload = {}) {
     requireNotLatched();
+    requirePro("mobile-remote");
     const access = requireAccess(payload.accessToken);
     failedPairAttempts = 0;
     const code = String(randomInt(100000, 1000000));
@@ -1855,6 +1909,7 @@ export function createDesktopToolService(options = {}) {
 
   async function handle(tool, payload = {}, context = {}) {
     requireNotLatched();
+    requirePro(tool);
     const effectivePayload = { ...payload };
     if (context.remoteToken) {
       const remote = activeRemote(context.remoteToken);
@@ -1973,6 +2028,8 @@ export function createDesktopToolService(options = {}) {
         doctrine: oviaDoctrine(),
         emergency: emergencyStatus(),
         native: process.env.RAIMOSA_NATIVE ?? null,
+        license: licenseStatus(),
+        proTools: [...PRO_TOOLS, ...PRO_FEATURES],
         remote: {
           available: true,
           mode: "paired-local-network",
@@ -1983,6 +2040,9 @@ export function createDesktopToolService(options = {}) {
     emergencyStop,
     emergencyClear,
     emergencyStatus,
+    licenseStatus,
+    activateLicense,
+    removeLicense,
     plan: planCommand,
     handle,
     startAccess,

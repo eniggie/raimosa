@@ -21,6 +21,9 @@ export const desktopApi = {
   run: (tool, payload = {}) => request(`/tools/${tool}`, payload),
   exportReceipts: (format, tool) =>
     request("/receipts/export", { format, tool }),
+  licenseStatus: () => request("/license/status", {}),
+  activateLicense: (key) => request("/license/activate", { key }),
+  removeLicense: () => request("/license/remove", {}),
   emergencyStop: () => request("/stop", {}),
   emergencyClear: () => request("/stop/clear", {}),
   emergencyStatus: () => request("/stop/status", {}),

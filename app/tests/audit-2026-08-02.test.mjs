@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { createDesktopToolService } from "../server/desktop-tools.mjs";
 import { planCommand } from "../server/ovia-core.mjs";
+import { proKey } from "./helpers.mjs";
 
 async function workspace(name) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), `raimosa-${name}-`));
@@ -102,6 +103,7 @@ test("the health scan fails while the emergency latch is active", async () => {
 test("a paired remote can still run control tools under live All Access", async () => {
   const paths = await workspace("remote-control");
   const service = open(paths);
+  service.activateLicense({ key: proKey() });
   const access = service.startAccess({ duration: 300, confirmed: true });
   const pairing = service.startRemotePairing({
     accessToken: access.session.token,
@@ -137,6 +139,7 @@ test("a paired remote can still run control tools under live All Access", async 
 test("repeated failed pairing attempts revoke every outstanding code", async () => {
   const paths = await workspace("pair-lockout");
   const service = open(paths);
+  service.activateLicense({ key: proKey() });
   const access = service.startAccess({ duration: 300, confirmed: true });
   const pairing = service.startRemotePairing({
     accessToken: access.session.token,
