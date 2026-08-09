@@ -100,26 +100,37 @@ else
   say "Skipping the macOS disk image (not running on macOS)."
 fi
 
+# ---------- Vendor Node for Windows and Linux (self-contained downloads) ----------
+"$ROOT/native/fetch-node.sh"
+
 # ---------- Windows ----------
 say "Packaging the Windows archive…"
 WIN="$OUT/win-stage/RAIMOSA-$VERSION"
-mkdir -p "$WIN/app" "$WIN/native/windows"
+mkdir -p "$WIN/app" "$WIN/native/windows" "$WIN/vendor/node"
 cp -R "$ROOT/app/bin" "$ROOT/app/server" "$ROOT/app/dist" "$WIN/app/"
 cp "$ROOT/app/package.json" "$WIN/app/"
 cp "$ROOT/native/windows/RAIMOSA.ps1" "$WIN/native/windows/"
 cp "$ROOT/README.md" "$WIN/"
+# Bundle the Node runtime for both Windows CPU architectures so nothing needs
+# installing on the target machine.
+if [ -d "$ROOT/vendor/node/win-x64" ]; then
+  cp -R "$ROOT/vendor/node/win-x64" "$ROOT/vendor/node/win-arm64" "$WIN/vendor/node/"
+  say "Bundled Node for Windows (x64 + arm64)."
+else
+  say "NOTE: vendor/node missing — Windows build will require Node 22+ installed."
+fi
 cat > "$WIN/START HERE.txt" <<'NOTE'
 RAIMOSA AI for Windows
-
-REQUIREMENT: Node.js 22 or newer from https://nodejs.org
-  (Node ships the built-in SQLite that RAIMOSA's receipt ledger uses.)
 
 To start:
   Right-click START-RAIMOSA.cmd and choose Run.
 
+Nothing to install — the Node runtime is bundled inside this folder.
+
 NOT YET VERIFIED ON REAL WINDOWS HARDWARE. This shell was written and reviewed
-on macOS. If it fails, the cross-platform command line still works:
-  cd app && npm install && npm start
+on macOS. If the window does not appear, the runtime still serves at the
+http://localhost address it prints, and this also works:
+  vendor\node\win-x64\node.exe app\bin\raimosa.mjs
 
 © ECONTEUR LLC
 NOTE
@@ -132,8 +143,14 @@ say "Built RAIMOSA-$VERSION-windows.zip ($(du -h "$OUT/RAIMOSA-$VERSION-windows.
 # ---------- Linux ----------
 say "Packaging the Linux archive…"
 LNX="$OUT/linux-stage/RAIMOSA-$VERSION"
-mkdir -p "$LNX/app" "$LNX/native/linux"
+mkdir -p "$LNX/app" "$LNX/native/linux" "$LNX/vendor/node"
 cp -R "$ROOT/app/bin" "$ROOT/app/server" "$ROOT/app/dist" "$LNX/app/"
+if [ -d "$ROOT/vendor/node/linux-x64" ]; then
+  cp -R "$ROOT/vendor/node/linux-x64" "$ROOT/vendor/node/linux-arm64" "$LNX/vendor/node/"
+  say "Bundled Node for Linux (x64 + arm64)."
+else
+  say "NOTE: vendor/node missing — Linux build will require Node 22+ installed."
+fi
 cp "$ROOT/app/package.json" "$LNX/app/"
 cp "$ROOT/app/public/assets/raimosa-app-icon.png" "$LNX/app/"
 mkdir -p "$LNX/app/public/assets"
@@ -144,14 +161,11 @@ cp "$ROOT/README.md" "$LNX/"
 cat > "$LNX/START HERE.txt" <<'NOTE'
 RAIMOSA AI for Linux
 
-REQUIREMENT: Node.js 22 or newer
-  (Node ships the built-in SQLite that RAIMOSA's receipt ledger uses.)
-
 To add RAIMOSA to your application menu:
   ./native/linux/install-desktop.sh
 
-Or run it directly:
-  node app/bin/raimosa.mjs
+Or run it directly (Node runtime is bundled — nothing to install):
+  vendor/node/linux-x64/node app/bin/raimosa.mjs
 
 NOT YET VERIFIED ON REAL LINUX HARDWARE. This launcher was written and reviewed
 on macOS. It opens a dedicated app window using an installed Chromium-family

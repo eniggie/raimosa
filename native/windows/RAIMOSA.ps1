@@ -7,8 +7,9 @@
 # when the window closes, so no authority can outlive the window that showed
 # it — the same contract the macOS shell holds to.
 #
-# UNVERIFIED ON REAL HARDWARE. This was written on macOS and has not been run
-# on Windows. Treat the first launch as a test, not a release.
+# Node is bundled (vendor/node/win-<arch>), so a downloaded copy needs nothing
+# installed. UNVERIFIED ON REAL WINDOWS HARDWARE — written and reviewed on
+# macOS. Treat the first launch as a test, not a release.
 
 $ErrorActionPreference = 'Stop'
 $MinNodeMajor = 22
@@ -20,14 +21,26 @@ function Fail { param($m) [System.Windows.Forms.MessageBox]::Show($m, 'RAIMOSA A
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# --- Preconditions, reported plainly rather than failing silently ---
-$node = Get-Command node -ErrorAction SilentlyContinue
-if (-not $node) {
-  Fail "Node.js $MinNodeMajor or newer is required.`n`nInstall it from https://nodejs.org, then reopen RAIMOSA."
-}
-$nodeMajor = [int](& node -p 'process.versions.node.split(".")[0]')
-if ($nodeMajor -lt $MinNodeMajor) {
-  Fail "Node $(& node -v) is too old. RAIMOSA needs Node $MinNodeMajor or newer for its built-in SQLite ledger."
+# --- Resolve Node. Prefer the bundled runtime so a downloaded copy needs
+#     nothing installed; fall back to a system Node only if the bundled one is
+#     absent (e.g. an unsupported CPU architecture). ---
+$arch = if ([Environment]::Is64BitOperatingSystem) {
+  if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { 'arm64' } else { 'x64' }
+} else { 'x64' }
+$bundledNode = Join-Path $Root "vendor\node\win-$arch\node.exe"
+
+if (Test-Path $bundledNode) {
+  $nodeExe = $bundledNode
+} else {
+  $sys = Get-Command node -ErrorAction SilentlyContinue
+  if (-not $sys) {
+    Fail "This build has no bundled Node for your CPU ($arch) and none is installed.`n`nInstall Node.js $MinNodeMajor+ from https://nodejs.org, then reopen RAIMOSA."
+  }
+  $sysMajor = [int](& node -p 'process.versions.node.split(".")[0]')
+  if ($sysMajor -lt $MinNodeMajor) {
+    Fail "The installed Node $(& node -v) is too old. RAIMOSA needs Node $MinNodeMajor or newer."
+  }
+  $nodeExe = $sys.Source
 }
 if (-not (Test-Path $Entry)) { Fail "The RAIMOSA runtime is missing at:`n$Entry" }
 
@@ -39,13 +52,13 @@ if (-not $webViewAssembly) {
 
 # --- Start the runtime on a free-ish port ---
 $port = Get-Random -Minimum 4200 -Maximum 4899
-$runtime = Start-Process -FilePath $node.Source `
+$runtime = Start-Process -FilePath $nodeExe `
   -ArgumentList @($Entry, '--port', $port, '--no-open') `
   -PassThru -WindowStyle Hidden `
   -Environment @{ RAIMOSA_NATIVE = 'windows' } 2>$null
 if (-not $runtime) {
   $psi = New-Object System.Diagnostics.ProcessStartInfo
-  $psi.FileName = $node.Source
+  $psi.FileName = $nodeExe
   $psi.Arguments = "`"$Entry`" --port $port --no-open"
   $psi.UseShellExecute = $false
   $psi.CreateNoWindow = $true

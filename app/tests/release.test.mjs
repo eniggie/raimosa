@@ -69,3 +69,35 @@ test("installers never print instructions for a command that does not exist", as
   assert.match(ps, /raimosa\.cmd/);
   assert.match(ps, /Options:\s+\$launch/);
 });
+
+test("Windows and Linux releases bundle their own Node runtime", async () => {
+  const fetchNode = await fs.readFile(
+    path.join(repoRoot, "native/fetch-node.sh"),
+    "utf8",
+  );
+  // Fetches all four platform binaries and verifies them before extracting.
+  for (const t of ["win-x64", "win-arm64", "linux-x64", "linux-arm64"]) {
+    assert.ok(fetchNode.includes(t), `${t} must be fetched`);
+  }
+  assert.match(fetchNode, /shasum -a 256 -c/);
+  assert.match(fetchNode, /Nothing extracted/);
+
+  const release = await fs.readFile(path.join(repoRoot, "release.sh"), "utf8");
+  // release.sh vendors Node into both archives and no longer demands it.
+  assert.match(release, /fetch-node\.sh/);
+  assert.match(release, /vendor\/node\/win-x64/);
+  assert.match(release, /vendor\/node\/linux-x64/);
+  assert.ok(!release.includes("REQUIREMENT: Node.js 22 or newer from"));
+
+  // Launchers prefer the bundled runtime, keyed by CPU architecture.
+  const ps = await fs.readFile(
+    path.join(repoRoot, "native/windows/RAIMOSA.ps1"),
+    "utf8",
+  );
+  assert.match(ps, /vendor\\node\\win-\$arch\\node\.exe/);
+  const lnx = await fs.readFile(
+    path.join(repoRoot, "native/linux/install-desktop.sh"),
+    "utf8",
+  );
+  assert.match(lnx, /vendor\/node\/linux-\$NA\/node/);
+});

@@ -6,3 +6,4 @@ app/local-workspace/.raimosa/
 *.tgz
 dist-release/
 native/macos/build/
+vendor/node/

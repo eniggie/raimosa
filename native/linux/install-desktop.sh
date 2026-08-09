@@ -13,7 +13,7 @@
 # chrome-less window with no tabs or address bar. The runtime is still owned by
 # the launcher and is terminated when the window closes.
 #
-# UNVERIFIED ON REAL HARDWARE. Written on macOS, not yet run on Linux.
+# UNVERIFIED ON REAL LINUX HARDWARE. Written on macOS, not yet run on Linux.
 
 set -euo pipefail
 
@@ -29,13 +29,24 @@ fail() { printf '\n  ERROR: %s\n\n' "$1" >&2; exit 1; }
 
 printf '\n  RAIMOSA AI — Linux desktop integration\n\n'
 
-command -v node >/dev/null 2>&1 || fail "Node.js is not installed.
-  RAIMOSA needs Node ${MIN_NODE_MAJOR} or newer for its built-in SQLite ledger.
-  Install it from https://nodejs.org or your package manager, then rerun this."
-
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-[ "$NODE_MAJOR" -ge "$MIN_NODE_MAJOR" ] || fail "Node $(node -v) is too old — RAIMOSA needs Node ${MIN_NODE_MAJOR}+."
-say "Node $(node -v) — OK"
+# Prefer the bundled Node so nothing needs installing; fall back to a system
+# Node only for a CPU architecture we did not bundle.
+case "$(uname -m)" in
+  x86_64|amd64) NODE_ARCH="x64" ;;
+  aarch64|arm64) NODE_ARCH="arm64" ;;
+  *) NODE_ARCH="" ;;
+esac
+BUNDLED_NODE="$ROOT/vendor/node/linux-$NODE_ARCH/node"
+if [ -n "$NODE_ARCH" ] && [ -x "$BUNDLED_NODE" ]; then
+  say "Using the bundled Node runtime ($NODE_ARCH) — nothing to install."
+else
+  command -v node >/dev/null 2>&1 || fail "This build has no bundled Node for your CPU ($(uname -m)) and none is installed.
+  Install Node.js ${MIN_NODE_MAJOR}+ from https://nodejs.org or your package manager, then rerun this."
+  NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+  [ "$NODE_MAJOR" -ge "$MIN_NODE_MAJOR" ] || fail "The installed Node $(node -v) is too old — RAIMOSA needs Node ${MIN_NODE_MAJOR}+."
+  BUNDLED_NODE="$(command -v node)"
+  say "Using the installed Node $(node -v)."
+fi
 
 mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_DIR"
 
@@ -46,7 +57,16 @@ set -euo pipefail
 ROOT="__ROOT__"
 PORT=$(( 4200 + RANDOM % 600 ))
 
-RAIMOSA_NATIVE=linux node "$ROOT/app/bin/raimosa.mjs" --port "$PORT" --no-open &
+# Prefer the bundled Node for this CPU; fall back to a system Node.
+case "$(uname -m)" in
+  x86_64|amd64) NA="x64" ;;
+  aarch64|arm64) NA="arm64" ;;
+  *) NA="" ;;
+esac
+NODE_BIN="$ROOT/vendor/node/linux-$NA/node"
+[ -n "$NA" ] && [ -x "$NODE_BIN" ] || NODE_BIN="node"
+
+RAIMOSA_NATIVE=linux "$NODE_BIN" "$ROOT/app/bin/raimosa.mjs" --port "$PORT" --no-open &
 RUNTIME=$!
 # Always take the runtime down with the window, however this script exits.
 trap 'kill "$RUNTIME" 2>/dev/null || true; wait "$RUNTIME" 2>/dev/null || true' EXIT INT TERM

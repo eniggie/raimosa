@@ -74,7 +74,7 @@ test("the Windows and Linux shells own their runtime and admit they are unverifi
     path.join(repoRoot, "native/windows/RAIMOSA.ps1"),
     "utf8",
   );
-  assert.match(windows, /UNVERIFIED ON REAL HARDWARE/);
+  assert.match(windows, /UNVERIFIED ON REAL WINDOWS HARDWARE/);
   assert.match(windows, /api\/raimosa\/health/);
   assert.match(windows, /FormClosing/);
   assert.match(windows, /\.Kill\(\)/);
@@ -84,7 +84,7 @@ test("the Windows and Linux shells own their runtime and admit they are unverifi
     path.join(repoRoot, "native/linux/install-desktop.sh"),
     "utf8",
   );
-  assert.match(linux, /UNVERIFIED ON REAL HARDWARE/);
+  assert.match(linux, /UNVERIFIED ON REAL LINUX HARDWARE/);
   assert.match(linux, /trap /);
   assert.match(linux, /api\/raimosa\/health/);
   // It must not claim to be a compiled native shell.

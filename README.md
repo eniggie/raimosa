@@ -21,8 +21,8 @@ suite fails, nothing is packaged.
 | Artifact | Size | Needs |
 |---|---|---|
 | `RAIMOSA-<version>-macOS.dmg` | ~88 MB | **Nothing.** Node bundled; universal (Apple Silicon + Intel); signed + notarized |
-| `RAIMOSA-<version>-windows.zip` | ~1.5 MB | Node 22+ |
-| `RAIMOSA-<version>-linux.tar.gz` | ~1.5 MB | Node 22+ |
+| `RAIMOSA-<version>-windows.zip` | ~61 MB | **Nothing.** Node bundled (x64 + arm64) |
+| `RAIMOSA-<version>-linux.tar.gz` | ~85 MB | **Nothing.** Node bundled (x64 + arm64) |
 
 Every build is checksummed. Verify a download with:
 
@@ -52,9 +52,10 @@ opens a WebView2 window that owns the runtime the same way.
 **Linux** — `./native/linux/install-desktop.sh` adds RAIMOSA to your application
 menu with its own icon and a dedicated app window.
 
-> The Windows and Linux shells were written on macOS and have **not been run on
-> real hardware yet**. Both say so in their own files. The macOS build is the one
-> that has been verified end to end.
+> The Windows and Linux downloads now **bundle their own Node runtime**, so they
+> need nothing installed — but the shells themselves were written on macOS and
+> have **not been run on real hardware yet**. Both say so in their own files and
+> in `START HERE.txt`. The macOS build is the one verified end to end.
 
 ## Install
 
