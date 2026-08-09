@@ -7,3 +7,4 @@ app/local-workspace/.raimosa/
 dist-release/
 native/macos/build/
 vendor/node/
+dist-store/

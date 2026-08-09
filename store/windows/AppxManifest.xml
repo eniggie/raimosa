@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RAIMOSA AI — Microsoft Store (MSIX) manifest.
+
+  RAIMOSA is a full-trust desktop utility: it spawns a bundled Node runtime,
+  controls applications and power, and reads the filesystem. That requires the
+  `runFullTrust` restricted capability, which Microsoft grants to packaged
+  desktop apps (unlike the fully-sandboxed Mac App Store). The identity fields
+  below are placeholders — Partner Center assigns the real Publisher and
+  Package identity when the app is reserved; package.ps1 substitutes them.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="ECONTEURLLC.RAIMOSAAI"
+    Publisher="CN=__PUBLISHER_CN__"
+    Version="0.1.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>RAIMOSA AI</DisplayName>
+    <PublisherDisplayName>ECONTEUR LLC</PublisherDisplayName>
+    <Logo>assets\StoreLogo.png</Logo>
+    <Description>A local, governed desktop commander with a tamper-evident receipt ledger. Everything runs on your machine.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22631.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="RAIMOSA" Executable="RAIMOSA.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="RAIMOSA AI"
+        Description="A local, governed desktop commander."
+        BackgroundColor="#07030D"
+        Square150x150Logo="assets\Square150x150Logo.png"
+        Square44x44Logo="assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="assets\Wide310x150Logo.png"
+          Square310x310Logo="assets\Square310x310Logo.png"
+          Square71x71Logo="assets\Square71x71Logo.png" />
+        <uap:SplashScreen Image="assets\SplashScreen.png" BackgroundColor="#07030D" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Full-trust desktop app: needs to spawn its Node runtime and reach the
+         filesystem the user approves inside RAIMOSA. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
