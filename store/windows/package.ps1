@@ -58,14 +58,20 @@ Say "Compiling the launcher…"
 if ($LASTEXITCODE -ne 0) { Fail "Launcher compilation failed." }
 
 # --- Manifest with the real identity ---
+# The real Partner Center Publisher CN is already baked into AppxManifest.xml.
+# If a CN is passed (or the old placeholder is still present), substitute it;
+# either way, force the <Identity> Version to match app/package.json so a
+# version bump can never ship under a stale manifest version.
 $manifest = Get-Content "$Store\AppxManifest.xml" -Raw
-if ($PublisherCN) { $manifest = $manifest -replace 'CN=__PUBLISHER_CN__', $PublisherCN }
-elseif ($manifest -match '__PUBLISHER_CN__') {
-  Say "NOTE: no Publisher CN supplied. Set RAIMOSA_PUBLISHER_CN or pass -PublisherCN"
-  Say "      with the value from Partner Center before submitting."
+if ($PublisherCN) {
+  $manifest = $manifest -replace 'Publisher="[^"]*"', "Publisher=`"$PublisherCN`""
+} elseif ($manifest -match '__PUBLISHER_CN__') {
+  Fail "AppxManifest.xml still has the __PUBLISHER_CN__ placeholder. Pass -PublisherCN or set RAIMOSA_PUBLISHER_CN with the value from Partner Center."
 }
-$manifest = $manifest -replace 'Version="0\.0\.0\.0"', "Version=`"$Version`""
+# Replace whatever Version the <Identity> element currently carries.
+$manifest = $manifest -replace '(<Identity[^>]*?Version=")[^"]*(")', "`${1}$Version`${2}"
 Set-Content "$Stage\AppxManifest.xml" $manifest -Encoding UTF8
+Say "Manifest identity: $([regex]::Match($manifest,'Name="([^"]*)"').Groups[1].Value) v$Version"
 
 # --- Build the MSIX ---
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
