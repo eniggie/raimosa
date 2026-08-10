@@ -1393,7 +1393,17 @@ export function createDesktopToolService(options = {}) {
           "All adapter dispatch is blocked at the server until the latch is cleared.",
       }),
     );
-    return { ok: true, ...emergencyStatus() };
+    // Report what was actually revoked. The recovery UI states these as facts,
+    // so they must come from the server that did the revoking — never from a
+    // static checklist the interface merely asserts.
+    return {
+      ok: true,
+      ...emergencyStatus(),
+      revoked: {
+        accessSessions: accessSessions.length,
+        remoteSessions: remoteCount,
+      },
+    };
   }
 
   function emergencyClear() {

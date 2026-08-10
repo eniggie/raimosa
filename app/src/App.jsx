@@ -48,8 +48,6 @@ import { ToolsView } from "./views/ToolsView.jsx";
 
 const nav = [
   ["Home", House],
-  ["Missions", CheckCircle],
-  ["Workflows", Lightning],
   ["Intelligence", Sparkle],
   ["Tools", Wrench],
   ["Remote", DeviceMobile],
@@ -220,16 +218,6 @@ function SideNav({ active, onChange }) {
   );
 }
 
-function PrototypeNotice() {
-  return (
-    <div className="prototype-notice" role="note">
-      <Sparkle size={15} />
-      <strong>Interactive preview</strong>
-      <span>Sample data · no device action will run</span>
-    </div>
-  );
-}
-
 function PageHeading({ eyebrow, title, description, action }) {
   return (
     <div className="page-heading">
@@ -243,54 +231,84 @@ function PageHeading({ eyebrow, title, description, action }) {
   );
 }
 
+function relativeTime(iso) {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const seconds = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+// Everything on this page is read from the live adapter: the capability
+// registry, the durable emergency latch, and the real receipt ledger. It must
+// never render a placeholder that looks like a record.
 function HomeView({
   onNavigate,
-  onOpenMission,
   onAllAccess,
   access,
   adapterOnline,
-  plan,
-  repairDrafted,
+  health,
+  receipts,
+  receiptsError,
 }) {
+  const capabilities = health?.capabilities ?? [];
+  const available = capabilities.filter((c) => c.status === "available");
+  const pro = health?.license?.pro === true;
+  const latched = health?.emergency?.latched === true;
+  const recent = receipts.slice(0, 3);
+  const lastReceipt = receipts[0] ?? null;
+
   return (
     <section className="workspace-page home-view">
-      <PrototypeNotice />
       <PageHeading
         eyebrow="COMMAND CENTER"
-        title="Good evening, Commander"
+        title={`${greeting()}, Commander`}
         description="One governed place to plan, approve, inspect, and verify RAIMOSA work."
         action={
           <button
             type="button"
             className="primary"
-            onClick={() => onOpenMission("launch")}
+            onClick={() => onNavigate("Tools")}
           >
-            Open active decision <ArrowRight size={18} />
+            Open tools <ArrowRight size={18} />
           </button>
         }
       />
       <div className="metric-grid" aria-label="Command center status">
         <article>
-          <span>NEEDS DECISION</span>
-          <strong>{plan === "awaiting" ? "1" : "0"}</strong>
+          <span>VERIFIED CAPABILITIES</span>
+          <strong>{adapterOnline ? available.length : "—"}</strong>
           <p>
-            {plan === "awaiting"
-              ? "Launch asset plan is awaiting approval."
-              : "No plan is waiting for approval."}
+            {adapterOnline
+              ? `${available.length} of ${capabilities.length} have a verified adapter on ${health?.platform ?? "this system"}.`
+              : "The local adapter is not responding."}
           </p>
-          <button type="button" onClick={() => onOpenMission("launch")}>
-            Review ledger <CaretRight />
+          <button type="button" onClick={() => onNavigate("Permissions")}>
+            Review permissions <CaretRight />
           </button>
         </article>
         <article>
-          <span>ACTIVE MISSIONS</span>
-          <strong>{repairDrafted ? "2" : "1"}</strong>
+          <span>RECEIPTS RECORDED</span>
+          <strong>{receiptsError ? "—" : receipts.length}</strong>
           <p>
-            One active launch mission
-            {repairDrafted ? " and one repair draft" : ""}.
+            {receiptsError
+              ? "The ledger could not be read."
+              : lastReceipt
+                ? `Last: ${lastReceipt.tool} · ${relativeTime(lastReceipt.timestamp) ?? "recorded"}.`
+                : "No adapter action has been recorded yet."}
           </p>
-          <button type="button" onClick={() => onNavigate("Missions")}>
-            View missions <CaretRight />
+          <button type="button" onClick={() => onNavigate("Ledger")}>
+            Open the ledger <CaretRight />
           </button>
         </article>
         <article className={access.active ? "access-live" : ""}>
@@ -313,36 +331,36 @@ function HomeView({
           <div className="surface-title">
             <div>
               <Activity />
-              <span>SAMPLE MISSION LEDGER</span>
+              <span>RECENT RECEIPTS</span>
             </div>
             <button type="button" onClick={() => onNavigate("Ledger")}>
               See runtime receipts
             </button>
           </div>
-          <div className="activity-item">
-            <CheckCircle />
-            <div>
-              <strong>Folder scan observed</strong>
-              <span>/Projects/Launch Assets · 9:12 AM</span>
-            </div>
-            <em>Receipt RC-0184</em>
-          </div>
-          <div className="activity-item">
-            <Sparkle />
-            <div>
-              <strong>Exact plan proposed</strong>
-              <span>12 renames · 4 moves · 0 deletions</span>
-            </div>
-            <em>Plan AP-0017-V2</em>
-          </div>
-          <div className="activity-item">
-            <Warning />
-            <div>
-              <strong>Checkpoint freshness finding</strong>
-              <span>Sample diagnostic evidence is ready to review</span>
-            </div>
-            <em>Finding FD-0042</em>
-          </div>
+          {receiptsError ? (
+            <p className="empty-note">
+              The receipt ledger could not be read: {receiptsError}
+            </p>
+          ) : recent.length === 0 ? (
+            <p className="empty-note">
+              No receipts yet. Every adapter action RAIMOSA takes is recorded
+              here as tamper-evident evidence.
+            </p>
+          ) : (
+            recent.map((entry) => (
+              <div className="activity-item" key={entry.id}>
+                {entry.verified ? <CheckCircle /> : <Warning />}
+                <div>
+                  <strong>{entry.tool}</strong>
+                  <span>
+                    {entry.scope} ·{" "}
+                    {relativeTime(entry.timestamp) ?? entry.timestamp}
+                  </span>
+                </div>
+                <em>{entry.id}</em>
+              </div>
+            ))
+          )}
         </section>
         <section className="surface trust-surface">
           <div className="surface-title">
@@ -359,16 +377,24 @@ function HomeView({
               </dd>
             </div>
             <div>
-              <dt>High-risk step-up</dt>
-              <dd className="ok">On</dd>
+              <dt>Licence</dt>
+              <dd className={pro ? "ok" : ""}>{pro ? "Pro" : "Free"}</dd>
             </div>
             <div>
               <dt>Emergency stop</dt>
-              <dd>Ready</dd>
+              <dd className={latched ? "" : "ok"}>
+                {latched ? "ENGAGED" : adapterOnline ? "Ready" : "Unknown"}
+              </dd>
             </div>
             <div>
               <dt>Last local receipt</dt>
-              <dd>9:12 AM</dd>
+              <dd>
+                {receiptsError
+                  ? "Unavailable"
+                  : lastReceipt
+                    ? (relativeTime(lastReceipt.timestamp) ?? "recorded")
+                    : "None yet"}
+              </dd>
             </div>
           </dl>
           <button
@@ -383,171 +409,6 @@ function HomeView({
     </section>
   );
 }
-
-function MissionsView({ plans, repairDrafted, onOpenMission }) {
-  const [filter, setFilter] = useState("all");
-  const planLabel = (plan) =>
-    ({
-      awaiting: "Awaiting approval",
-      approved: "Approved · ready to simulate",
-      running: "Simulation running",
-      verified: "Verified sample",
-      rejected: "Rejected · no action",
-    })[plan];
-  const showLaunch =
-    filter === "all" ||
-    ["awaiting", "approved", "rejected"].includes(plans.launch);
-  const showRepair =
-    repairDrafted &&
-    (filter === "all" ||
-      ["awaiting", "approved", "rejected"].includes(plans.repair));
-  const visibleCount = Number(showLaunch) + Number(showRepair);
-  return (
-    <section className="workspace-page">
-      <PrototypeNotice />
-      <PageHeading
-        eyebrow="MISSIONS"
-        title="Governed work"
-        description="Every mission binds intent, scope, authority, approval, evidence, and receipts."
-      />
-      <div className="list-toolbar">
-        <span>
-          {visibleCount} {visibleCount === 1 ? "mission" : "missions"}
-        </span>
-        <div role="group" aria-label="Filter missions">
-          <button
-            type="button"
-            className={`filter ${filter === "all" ? "active" : ""}`}
-            aria-pressed={filter === "all"}
-            onClick={() => setFilter("all")}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className={`filter ${filter === "attention" ? "active" : ""}`}
-            aria-pressed={filter === "attention"}
-            onClick={() => setFilter("attention")}
-          >
-            Needs attention
-          </button>
-        </div>
-      </div>
-      <div className="mission-list">
-        {showLaunch && (
-          <article>
-            <div className="mission-icon active">
-              <Folder />
-            </div>
-            <div>
-              <span>ML-2026-07-20-0017 · LAUNCH OPERATIONS</span>
-              <h2>Organize approved launch assets</h2>
-              <p>
-                Rename and move approved files inside one folder. No deletion.
-              </p>
-            </div>
-            <strong className={`state-pill ${plans.launch}`}>
-              {planLabel(plans.launch)}
-            </strong>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => onOpenMission("launch")}
-            >
-              Open ledger
-            </button>
-          </article>
-        )}
-        {showRepair && (
-          <article>
-            <div className="mission-icon draft">
-              <Wrench />
-            </div>
-            <div>
-              <span>MD-2026-07-22-0042 · REPAIR DRAFT</span>
-              <h2>Refresh ledger integrity checkpoint</h2>
-              <p>
-                Proposed from Finding FD-0042. Read-only evidence attached; no
-                repair has run.
-              </p>
-            </div>
-            <strong className={`state-pill ${plans.repair}`}>
-              {planLabel(plans.repair)}
-            </strong>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => onOpenMission("repair")}
-            >
-              Review draft
-            </button>
-          </article>
-        )}
-        {!visibleCount && (
-          <div className="empty-state">
-            <CheckCircle size={28} />
-            <strong>No missions need attention</strong>
-            <p>
-              Approved sample verification is complete. Switch back to All to
-              review history.
-            </p>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function WorkflowsView() {
-  const workflows = [
-    ["Launch asset preparation", "5 governed steps", "Ready", Folder],
-    ["Ledger checkpoint repair", "4 governed steps", "Draft", Wrench],
-    ["Release readiness review", "7 read-only checks", "Paused", ListChecks],
-  ];
-  return (
-    <section className="workspace-page">
-      <PrototypeNotice />
-      <PageHeading
-        eyebrow="WORKFLOWS"
-        title="Reusable governed patterns"
-        description="Workflows define the order of checks and approvals. They never grant authority by themselves."
-      />
-      <div className="workflow-grid">
-        {workflows.map(([title, detail, status, Icon]) => (
-          <article key={title}>
-            <div>
-              <Icon size={25} />
-            </div>
-            <span>{status}</span>
-            <h2>{title}</h2>
-            <p>{detail}</p>
-            <dl>
-              <div>
-                <dt>Approval</dt>
-                <dd>Before changes</dd>
-              </div>
-              <div>
-                <dt>Receipts</dt>
-                <dd>Every step</dd>
-              </div>
-            </dl>
-          </article>
-        ))}
-      </div>
-      <section className="surface workflow-note">
-        <ShieldCheck />
-        <div>
-          <strong>Workflow safety</strong>
-          <p>
-            Starting a workflow creates a Draft mission. RAIMOSA must still show
-            the exact plan and request approval.
-          </p>
-        </div>
-      </section>
-    </section>
-  );
-}
-
 function PermissionsView({
   access,
   capabilities = [],
@@ -652,26 +513,17 @@ function PermissionsView({
 }
 
 function SettingsView({ settings, onChange }) {
+  // Only settings that actually change behaviour belong here. A switch that
+  // writes state nothing reads is a fake control.
   const rows = [
-    [
-      "notifications",
-      "Decision notifications",
-      "Alert me when a mission needs approval.",
-    ],
     [
       "motion",
       "Reduced motion",
       "Minimize non-essential transitions and animated status.",
     ],
-    [
-      "receipts",
-      "Receipt summaries",
-      "Show concise verification receipts after sample runs.",
-    ],
   ];
   return (
     <section className="workspace-page settings-view">
-      <PrototypeNotice />
       <PageHeading
         eyebrow="SETTINGS"
         title="Local command preferences"
@@ -697,10 +549,10 @@ function SettingsView({ settings, onChange }) {
       <section className="surface local-card">
         <ShieldCheck />
         <div>
-          <strong>Local-first preview</strong>
+          <strong>Local-first</strong>
           <p>
-            These sample settings are held in this browser session. No account
-            or cloud state is changed.
+            This preference is held in this browser session. No account or cloud
+            state is changed.
           </p>
         </div>
       </section>
@@ -708,7 +560,7 @@ function SettingsView({ settings, onChange }) {
   );
 }
 
-function RuntimeLedgerView({ onOpenSample }) {
+function RuntimeLedgerView() {
   const [receipts, setReceipts] = useState([]);
   const [durable, setDurable] = useState(false);
   const [integrity, setIntegrity] = useState(null);
@@ -783,9 +635,6 @@ function RuntimeLedgerView({ onOpenSample }) {
         description="Verified adapter, access, scan, and mobile-remote events from this local RAIMOSA AI runtime."
         action={
           <div className="ledger-actions">
-            <button type="button" className="secondary" onClick={onOpenSample}>
-              Open sample mission
-            </button>
             <button
               type="button"
               className="primary"
@@ -907,361 +756,6 @@ function RuntimeLedgerView({ onOpenSample }) {
           ))}
         </section>
       )}
-    </section>
-  );
-}
-
-function Mission({
-  variant,
-  plan,
-  setPlan,
-  evidence,
-  setEvidence,
-  onEdit,
-  onSimulate,
-  onRuntimeLedger,
-  stopped,
-}) {
-  const repair = variant === "repair";
-  const status = {
-    awaiting: ["Awaiting approval", "Your decision is required", "—"],
-    approved: ["Approved", "Ready for a sample simulation", "9:14:02 AM"],
-    running: ["Approved", "Sample simulation is running", "9:14:02 AM"],
-    verified: ["Approved", "Approval matched this exact plan", "9:14:02 AM"],
-    rejected: ["Rejected", "No action taken", "9:14:02 AM"],
-  }[plan];
-  const execute =
-    plan === "running"
-      ? [
-          "Simulating",
-          repair
-            ? "Creating a sample checkpoint"
-            : "Applying changes to sample data",
-          "Now",
-        ]
-      : plan === "verified"
-        ? [
-            "Simulated",
-            repair ? "Sample checkpoint created" : "Sample changes completed",
-            "9:14:08 AM",
-          ]
-        : [
-            "Execution",
-            plan === "approved"
-              ? "Ready for sample simulation"
-              : "Pending approval",
-            "—",
-          ];
-  const verify =
-    plan === "verified"
-      ? [
-          "Verified",
-          repair
-            ? "Checkpoint hash matches · 0 altered events"
-            : "12 names match · 0 deletions",
-          "9:14:09 AM",
-        ]
-      : ["Verification", "Pending sample execution", "—"];
-
-  return (
-    <section className="mission">
-      <PrototypeNotice />
-      <div className="mission-title">
-        <span>
-          MISSION LEDGER <ArrowRight size={14} />
-        </span>
-        <h1>
-          {repair
-            ? "Refresh ledger integrity checkpoint"
-            : "Organize approved launch assets"}
-        </h1>
-        <p>
-          <CalendarBlank size={18} />{" "}
-          {repair ? "Wednesday, July 22, 2026" : "Monday, July 20, 2026"} <i />{" "}
-          Mission ID: {repair ? "MD-2026-07-22-0042" : "ML-2026-07-20-0017"}
-        </p>
-        <button type="button" className="secondary" onClick={onRuntimeLedger}>
-          <Activity size={18} />
-          View live runtime receipts
-        </button>
-      </div>
-      <section className="contract" aria-label="Mission contract">
-        <div>
-          <span>Intent</span>
-          <strong>
-            {repair
-              ? "Restore checkpoint freshness"
-              : "Organize and standardize launch assets"}
-          </strong>
-        </div>
-        <div>
-          <span>Scope</span>
-          <strong>
-            {repair ? "Local ledger only" : "Launch Assets folder only"}
-          </strong>
-        </div>
-        <div>
-          <span>Authority</span>
-          <strong>{repair ? "Create checkpoint" : "Rename + move"}</strong>
-        </div>
-        <div>
-          <span>Approval</span>
-          <strong>Before changes</strong>
-        </div>
-      </section>
-      <div className="ledger" role="region" aria-label="Mission ledger steps">
-        <div className="row head">
-          <span>Step</span>
-          <span>Status</span>
-          <span>Details</span>
-          <span>Time (EDT)</span>
-        </div>
-        <div className="row">
-          <span>1</span>
-          <span className="status">
-            <Eye size={20} />
-            Observed
-          </span>
-          <span>
-            {repair
-              ? "Read checkpoint freshness evidence"
-              : "Scanned /Projects/Launch Assets"}
-          </span>
-          <span>9:12:18 AM</span>
-        </div>
-        <div className="row proposed">
-          <span>2</span>
-          <span className="status">
-            <Sparkle size={20} />
-            Proposed
-          </span>
-          <span>Exact plan generated</span>
-          <span>
-            9:12:45 AM <CaretUp size={15} />
-          </span>
-        </div>
-        <div className="plan">
-          <div className="plan-copy">
-            <p>RAIMOSA proposes the following exact plan:</p>
-            <ul>
-              {repair ? (
-                <>
-                  <li>Create one signed local checkpoint</li>
-                  <li>Anchor 18 hours of pending events</li>
-                  <li>Verify the new checkpoint hash</li>
-                </>
-              ) : (
-                <>
-                  <li>Rename 12 files to the approved rule</li>
-                  <li>Move 4 final assets to /Final</li>
-                  <li>Leave 8 source files in place</li>
-                </>
-              )}
-            </ul>
-            <strong className="safe">
-              <Warning size={19} />
-              {repair
-                ? "No existing ledger events will be changed."
-                : "No files will be deleted."}
-            </strong>
-          </div>
-          <div className="preview">
-            <div className="phead">
-              <span>BEFORE</span>
-              <span>AFTER (Preview)</span>
-            </div>
-            {repair ? (
-              <>
-                <div>
-                  <span>Checkpoint: 18h old</span>
-                  <ArrowRight size={16} />
-                  <span>Checkpoint: current</span>
-                </div>
-                <div>
-                  <span>Events: unanchored</span>
-                  <ArrowRight size={16} />
-                  <span>Events: hash anchored</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <span>Launch_Video_FINAL_v3.mp4</span>
-                  <ArrowRight size={16} />
-                  <span>2026-07-Launch-Video-Final-v03.mp4</span>
-                </div>
-                <div>
-                  <span>hero-image (final).png</span>
-                  <ArrowRight size={16} />
-                  <span>2026-07-Launch-Hero-Image.png</span>
-                </div>
-              </>
-            )}
-            <small>
-              {repair
-                ? "Verification: ledger.checkpoint.freshness v1"
-                : "Naming rule: YYYY-MM-Launch-{Asset-Type}-{Descriptor}-v##.{ext}"}
-            </small>
-          </div>
-        </div>
-        <button
-          type="button"
-          className="evidence"
-          aria-expanded={evidence}
-          onClick={() => setEvidence(!evidence)}
-        >
-          <span>
-            <Folder size={20} />
-            Evidence (
-            {repair ? "1 finding, 18 hours" : "12 files, 0 duplicates"})
-          </span>
-          {evidence ? <CaretUp /> : <CaretDown />}
-        </button>
-        {evidence && (
-          <div className="evidence-open">
-            <span>
-              <Folder size={18} />
-              Approved scope
-            </span>
-            <strong>
-              {repair ? "Local ledger" : "/Projects/Launch Assets"}
-            </strong>
-            <span>
-              <LockKey size={18} />
-              Permission
-            </span>
-            <strong>{repair ? "Checkpoint only" : "Read / Write"}</strong>
-          </div>
-        )}
-        <div className={`row ${plan}`}>
-          <span>3</span>
-          <span className="status">
-            <ShieldCheck size={20} />
-            {status[0]}
-          </span>
-          <span>{status[1]}</span>
-          <span>{status[2]}</span>
-        </div>
-        <div
-          className={`row ${plan === "running" || plan === "verified" ? "progress" : "muted"}`}
-        >
-          <span>4</span>
-          <span className="status">
-            <Play size={20} />
-            {execute[0]}
-          </span>
-          <span>{execute[1]}</span>
-          <span>{execute[2]}</span>
-        </div>
-        <div className={`row ${plan === "verified" ? "verified" : "muted"}`}>
-          <span>5</span>
-          <span className="status">
-            <CheckCircle size={20} />
-            {verify[0]}
-          </span>
-          <span>{verify[1]}</span>
-          <span>{verify[2]}</span>
-        </div>
-      </div>
-      <div className="approval">
-        <div className="approval-metadata">
-          <div>
-            <Fingerprint size={25} />
-            <span>
-              <small>APPROVAL</small>
-              <strong>{repair ? "AP-0042-D1" : "AP-0017-V2"}</strong>
-            </span>
-          </div>
-          <div>
-            <Clock size={25} />
-            <span>
-              <small>EXPIRY</small>
-              <strong>10 minutes</strong>
-            </span>
-          </div>
-          <div>
-            <Activity size={25} />
-            <span>
-              <small>RISK</small>
-              <strong>Reversible</strong>
-            </span>
-          </div>
-          <div>
-            <ShieldCheck size={25} />
-            <span>
-              <small>GUARANTEE</small>
-              <strong>{repair ? "Append-only" : "No deletion"}</strong>
-            </span>
-          </div>
-        </div>
-        <section aria-label="Mission decision">
-          {plan === "awaiting" && (
-            <button
-              type="button"
-              className="primary"
-              onClick={() => setPlan("approved")}
-              disabled={stopped}
-            >
-              <Check size={20} />
-              Approve exact plan
-            </button>
-          )}
-          {plan === "approved" && (
-            <button
-              type="button"
-              className="primary"
-              onClick={onSimulate}
-              disabled={stopped}
-            >
-              <Play size={20} />
-              Simulate approved plan
-            </button>
-          )}
-          {plan === "running" && (
-            <button type="button" className="primary" disabled>
-              <Activity size={20} />
-              Simulation running…
-            </button>
-          )}
-          {plan === "verified" && (
-            <button
-              type="button"
-              className="verified-button"
-              onClick={() => setEvidence(true)}
-            >
-              <CheckCircle size={20} />
-              View verification
-            </button>
-          )}
-          {plan === "rejected" && (
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setPlan("awaiting")}
-            >
-              <ArrowRight size={20} />
-              Restore Draft
-            </button>
-          )}
-          <button type="button" className="secondary" onClick={onEdit}>
-            <NotePencil size={19} />
-            Edit scope
-          </button>
-          {plan !== "rejected" && plan !== "verified" && (
-            <button
-              type="button"
-              className="danger"
-              onClick={() => setPlan("rejected")}
-            >
-              <X size={19} />
-              Reject
-            </button>
-          )}
-        </section>
-        <small className="simulation-note">
-          Sample simulation only · no device changes
-        </small>
-      </div>
     </section>
   );
 }
@@ -1653,50 +1147,7 @@ function AccessDialog({ capabilities = [], busy, error, onClose, onActivate }) {
   );
 }
 
-function ScopeDialog({ onClose, onSave }) {
-  const dialogRef = useModalFocus(onClose);
-  return (
-    <div className="backdrop">
-      <section
-        ref={dialogRef}
-        className="modal compact"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="scope-title"
-      >
-        <button
-          type="button"
-          className="close"
-          onClick={onClose}
-          aria-label="Close scope dialog"
-        >
-          <X />
-        </button>
-        <Folder size={33} />
-        <span>NEW PLAN VERSION</span>
-        <h2 id="scope-title">Edit mission scope</h2>
-        <p>
-          Changing scope creates a new plan version and invalidates the current
-          approval.
-        </p>
-        <label className="field">
-          Approved folder
-          <input readOnly value="/Projects/Launch Assets" />
-        </label>
-        <div className="modal-actions">
-          <button type="button" className="secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="primary" onClick={onSave}>
-            Create version 3
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function StopDialog({ stage, onReview, onClear }) {
+function StopDialog({ stage, revoked, onReview, onClear }) {
   const dialogRef = useModalFocus(() => {});
   return (
     <div className="backdrop stopback">
@@ -1713,8 +1164,8 @@ function StopDialog({ stage, onReview, onClear }) {
         {stage === "blocked" ? (
           <>
             <p>
-              New mission steps and unused approvals are blocked. No completed
-              action has been reversed.
+              New adapter dispatch and unused approvals are blocked at the local
+              runtime. No completed action has been reversed.
             </p>
             <strong>
               <CheckCircle />
@@ -1727,22 +1178,33 @@ function StopDialog({ stage, onReview, onClear }) {
         ) : (
           <>
             <p>
-              Review is complete. All Access is off, no sample execution is
-              running, and one approved plan remains paused.
+              The latch is held by the server and survives a restart. It is
+              cleared only by the explicit action below.
             </p>
+            {/* These lines report what the server said it revoked. If the stop
+                response is unavailable, say so rather than assert a result. */}
             <div className="recovery-list">
-              <span>
-                <Check />
-                All Access revoked
-              </span>
-              <span>
-                <Check />
-                Execution queue paused
-              </span>
-              <span>
-                <Check />
-                Completed receipts preserved
-              </span>
+              {revoked ? (
+                <>
+                  <span>
+                    <Check />
+                    All Access revoked ({revoked.accessSessions})
+                  </span>
+                  <span>
+                    <Check />
+                    Paired remotes revoked ({revoked.remoteSessions})
+                  </span>
+                  <span>
+                    <Check />
+                    Completed receipts preserved
+                  </span>
+                </>
+              ) : (
+                <span>
+                  <Warning />
+                  The runtime did not report what was revoked.
+                </span>
+              )}
             </div>
             <button type="button" onClick={onClear}>
               Clear emergency stop
@@ -1766,17 +1228,10 @@ function loadSessionSettings() {
 
 export function App() {
   const [active, setActive] = useState("Ledger");
-  const [activeMission, setActiveMission] = useState("launch");
-  const [ledgerMode, setLedgerMode] = useState("runtime");
-  const [plans, setPlans] = useState({
-    launch: "awaiting",
-    repair: "awaiting",
-  });
-  const [evidence, setEvidence] = useState(false);
   const [accessModal, setAccessModal] = useState(false);
-  const [scopeModal, setScopeModal] = useState(false);
   const [stopped, setStopped] = useState(false);
   const [stopStage, setStopStage] = useState("blocked");
+  const [stopRevoked, setStopRevoked] = useState(null);
   const [access, setAccess] = useState({
     active: false,
     remaining: 0,
@@ -1786,15 +1241,14 @@ export function App() {
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessError, setAccessError] = useState("");
   const [health, setHealth] = useState(null);
+  const [receipts, setReceipts] = useState([]);
+  const [receiptsError, setReceiptsError] = useState("");
   const [command, setCommand] = useState(null);
-  const [repairDrafted, setRepairDrafted] = useState(false);
   const [oviaCollapsed, setOviaCollapsed] = useState(false);
   const [settings, setSettings] = useState(loadSessionSettings);
   const [announcement, setAnnouncement] = useState(
-    "RAIMOSA interactive preview ready.",
+    "RAIMOSA local adapter ready.",
   );
-  const simulationTimerRef = useRef(null);
-  const simulationEpochRef = useRef(0);
 
   useEffect(() => {
     if (!access.active) return;
@@ -1831,6 +1285,28 @@ export function App() {
       current = false;
     };
   }, []);
+
+  // The Home dashboard shows real receipts, so it reads the live ledger. It is
+  // refetched when the view is opened, never cached into a stale-looking claim.
+  useEffect(() => {
+    if (active !== "Home") return;
+    let current = true;
+    desktopApi
+      .receipts()
+      .then((data) => {
+        if (!current) return;
+        setReceipts(data.receipts ?? []);
+        setReceiptsError("");
+      })
+      .catch((error) => {
+        if (!current) return;
+        setReceipts([]);
+        setReceiptsError(error.message || "unavailable");
+      });
+    return () => {
+      current = false;
+    };
+  }, [active]);
 
   useEffect(() => {
     window.sessionStorage.setItem(
@@ -1872,24 +1348,6 @@ export function App() {
     setAnnouncement(`${next} opened.`);
   }
 
-  function openMission(next) {
-    setActiveMission(next);
-    setLedgerMode("mission");
-    setActive("Ledger");
-    resetViewportScroll();
-    setAnnouncement(
-      `${next === "repair" ? "Repair" : "Launch"} mission ledger opened.`,
-    );
-  }
-
-  function setActivePlan(next) {
-    setPlans((current) => ({
-      ...current,
-      [activeMission]:
-        typeof next === "function" ? next(current[activeMission]) : next,
-    }));
-  }
-
   async function startAccess(duration) {
     if (accessBusy) return;
     setAccessBusy(true);
@@ -1919,50 +1377,19 @@ export function App() {
   }
 
   function requestStop() {
-    simulationEpochRef.current += 1;
-    if (simulationTimerRef.current) {
-      window.clearTimeout(simulationTimerRef.current);
-      simulationTimerRef.current = null;
-    }
     // Latch the server first: this blocks every adapter dispatch and revokes
     // all authority runtime-wide, not just in this tab.
-    void desktopApi.emergencyStop().catch(() => {});
+    void desktopApi
+      .emergencyStop()
+      .then((result) => setStopRevoked(result.revoked ?? null))
+      .catch(() => setStopRevoked(null));
     setAccess({ active: false, remaining: 0, token: null, id: null });
     setAnnouncement(
       "Emergency stop active. All Access and mobile remote sessions were revoked.",
     );
-    setPlans((current) =>
-      Object.fromEntries(
-        Object.entries(current).map(([mission, state]) => [
-          mission,
-          state === "running" ? "approved" : state,
-        ]),
-      ),
-    );
     setStopStage("blocked");
     setStopped(true);
     setAnnouncement("Emergency stop active. New execution is blocked.");
-  }
-
-  function simulate() {
-    if (stopped) return;
-    const mission = activeMission;
-    const epoch = simulationEpochRef.current + 1;
-    simulationEpochRef.current = epoch;
-    if (simulationTimerRef.current)
-      window.clearTimeout(simulationTimerRef.current);
-    setPlans((current) => ({ ...current, [mission]: "running" }));
-    setAnnouncement("Sample simulation started. No device changes will occur.");
-    simulationTimerRef.current = window.setTimeout(() => {
-      if (simulationEpochRef.current !== epoch) return;
-      setPlans((current) =>
-        current[mission] === "running"
-          ? { ...current, [mission]: "verified" }
-          : current,
-      );
-      simulationTimerRef.current = null;
-      setAnnouncement("Sample simulation verified with no deletions.");
-    }, 2500);
   }
 
   let workspace;
@@ -1970,50 +1397,17 @@ export function App() {
     workspace = (
       <HomeView
         onNavigate={navigate}
-        onOpenMission={openMission}
         onAllAccess={() =>
           access.active ? navigate("Permissions") : setAccessModal(true)
         }
         access={access}
         adapterOnline={Boolean(health)}
-        plan={plans.launch}
-        repairDrafted={repairDrafted}
+        health={health}
+        receipts={receipts}
+        receiptsError={receiptsError}
       />
     );
-  if (active === "Missions")
-    workspace = (
-      <MissionsView
-        plans={plans}
-        repairDrafted={repairDrafted}
-        onOpenMission={openMission}
-      />
-    );
-  if (active === "Workflows") workspace = <WorkflowsView />;
-  if (active === "Ledger")
-    workspace =
-      ledgerMode === "runtime" ? (
-        <RuntimeLedgerView
-          onOpenSample={() => {
-            setLedgerMode("mission");
-            setAnnouncement("Sample mission ledger opened.");
-          }}
-        />
-      ) : (
-        <Mission
-          variant={activeMission}
-          plan={plans[activeMission]}
-          setPlan={setActivePlan}
-          evidence={evidence}
-          setEvidence={setEvidence}
-          onEdit={() => setScopeModal(true)}
-          onSimulate={simulate}
-          onRuntimeLedger={() => {
-            setLedgerMode("runtime");
-            setAnnouncement("Live runtime receipt ledger opened.");
-          }}
-          stopped={stopped}
-        />
-      );
+  if (active === "Ledger") workspace = <RuntimeLedgerView />;
   if (active === "Intelligence")
     workspace = (
       <IntelligenceView
@@ -2119,19 +1513,10 @@ export function App() {
           onActivate={startAccess}
         />
       )}
-      {scopeModal && (
-        <ScopeDialog
-          onClose={() => setScopeModal(false)}
-          onSave={() => {
-            setActivePlan("awaiting");
-            setScopeModal(false);
-            setAnnouncement("Plan version 3 created and awaiting approval.");
-          }}
-        />
-      )}
       {stopped && (
         <StopDialog
           stage={stopStage}
+          revoked={stopRevoked}
           onReview={() => setStopStage("review")}
           onClear={() => {
             void desktopApi.emergencyClear().catch(() => {});

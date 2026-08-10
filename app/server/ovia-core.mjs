@@ -112,7 +112,7 @@ export const capabilityCatalog = [
       win32: "windows-start-process",
     }),
     description:
-      "Discover installed applications and control only an exact selected application. Launch works on macOS and Windows; Linux discovery is read-only.",
+      "Discover installed applications and control only an exact selected application. Available on macOS and Windows.",
   },
   {
     id: "process-status",
@@ -125,9 +125,15 @@ export const capabilityCatalog = [
   {
     id: "agent-runtime-monitor",
     title: "Discover and monitor local AI agent runtimes",
-    status: "available",
+    // The adapter shells out to /bin/ps and /usr/bin/which, which do not exist
+    // on Windows. Advertising it there would expose a control that can only
+    // fail — the registry, not the UI, is where that must be gated.
+    status: desktopStatus({ darwin: true, linux: true }),
     risk: "read-only",
-    adapter: "local-agent-runtime-monitor",
+    adapter: desktopAdapter({
+      darwin: "local-agent-runtime-monitor",
+      linux: "local-agent-runtime-monitor",
+    }),
     description:
       "Detect supported local agent CLIs and their running processes without reading prompts, transcripts, credentials, or private state.",
   },
@@ -341,21 +347,62 @@ const intentRules = [
   },
   { id: "compare-folders", words: ["compare", "difference", "diff", "versus"] },
   { id: "clipboard", words: ["clipboard", "copy to clipboard", "paste"] },
-  { id: "system-power", words: ["sleep", "restart", "shutdown", "shut down"] },
+  {
+    id: "system-power",
+    // "restart"/"shutdown" are unambiguous on their own. "sleep" is not — it is
+    // an ordinary English word — so it only counts when the sentence also
+    // refers to the machine. A high-impact capability must never be selected by
+    // one generic word.
+    words: ["restart", "reboot", "shutdown", "shut down", "power off"],
+    weakWords: ["sleep"],
+    context: [
+      "computer",
+      "mac",
+      "macbook",
+      "machine",
+      "laptop",
+      "desktop",
+      "system",
+      "device",
+      "pc",
+    ],
+  },
   { id: "screen-capture", words: ["screenshot", "screen capture"] },
 ];
 
 export function planCommand(command, { root } = {}) {
   const text = String(command ?? "").trim();
   const lower = text.toLowerCase();
+  // Match on whole words, not bare substrings. `includes("move")` also fires
+  // inside "remove", and `includes("sleep")` fires on "how do I sleep better" —
+  // which would select the high-impact system-power capability from a sentence
+  // that expressed no such intent. A wrong plan still requires approval, but it
+  // is the opposite failure from the clarification-needed guarantee below.
+  const hasPhrase = (phrase) => {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, "i").test(
+      lower,
+    );
+  };
   const matches = intentRules
-    .map((rule) => ({
-      ...rule,
-      score: rule.words.reduce(
-        (score, word) => score + (lower.includes(word) ? 1 : 0),
+    .map((rule) => {
+      let score = rule.words.reduce(
+        (total, word) => total + (hasPhrase(word) ? 1 : 0),
         0,
-      ),
-    }))
+      );
+      // An ambiguous everyday word only counts when the sentence also refers to
+      // the machine, so "sleep better at night" cannot select system-power.
+      if (rule.weakWords?.length) {
+        const referencesDevice = (rule.context ?? []).some(hasPhrase);
+        if (referencesDevice) {
+          score += rule.weakWords.reduce(
+            (total, word) => total + (hasPhrase(word) ? 1 : 0),
+            0,
+          );
+        }
+      }
+      return { ...rule, score };
+    })
     .filter((rule) => rule.score > 0)
     .sort((a, b) => b.score - a.score);
   // No keyword match means OVIA AI does not understand the request. Say so.

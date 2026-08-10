@@ -658,7 +658,7 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
 
           <ToolSection
             icon={Play}
-            eyebrow="VERIFIED MACOS APPS"
+            eyebrow="VERIFIED APPLICATIONS"
             pro
             locked={!pro}
             onUnlock={focusLicense}
@@ -914,7 +914,7 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
             icon={Bell}
             eyebrow="VISIBLE SIDE EFFECT"
             title="Local notification"
-            description="Send one visible macOS notification after you provide its exact message."
+            description="Send one visible desktop notification after you provide its exact message."
           >
             <label className="tool-field">
               Notification text
