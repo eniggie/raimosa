@@ -67,7 +67,7 @@ test("fulfillment verifiers reject bad signatures, accept good ones", async () =
   );
 
   // Stripe: HMAC over "<t>.<body>" in the v1 field.
-  const t = "1700000000";
+  const t = String(Math.floor(Date.now() / 1000));
   const sBody = Buffer.from(
     JSON.stringify({
       type: "checkout.session.completed",
@@ -85,4 +85,29 @@ test("fulfillment verifiers reject bad signatures, accept good ones", async () =
     verifyStripe(sBody, { "stripe-signature": `t=${t},v1=deadbeef` }),
     false,
   );
+
+  // Replay protection: a correctly signed webhook with a stale timestamp is
+  // refused (Stripe's 5-minute tolerance).
+  const stale = "1700000000";
+  const staleSig = createHmac("sha256", "test-stripe")
+    .update(`${stale}.${sBody.toString("utf8")}`)
+    .digest("hex");
+  assert.equal(
+    verifyStripe(sBody, { "stripe-signature": `t=${stale},v1=${staleSig}` }),
+    false,
+  );
+
+  // A Stripe customer id is not an email and must never become a holder.
+  const { buyerFromStripe } = mod;
+  assert.ok(
+    buyerFromStripe({
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_2", customer: "cus_ABC123" } },
+    }).skip,
+  );
+});
+
+test("verifyLicenseKey refuses oversized and junk input", () => {
+  assert.equal(verifyLicenseKey("RAIMOSA-" + "A".repeat(9000)).valid, false);
+  assert.equal(verifyLicenseKey(null).valid, false);
 });

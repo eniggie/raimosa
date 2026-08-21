@@ -51,6 +51,10 @@ function fromBase64Url(text) {
  */
 export function verifyLicenseKey(rawKey) {
   const key = String(rawKey ?? "").trim();
+  // A real key is ~300 characters; refuse anything absurd before doing any
+  // base64 or signature work on it.
+  if (key.length > 8192)
+    return { valid: false, reason: "The license key is malformed." };
   if (!key.startsWith(KEY_PREFIX))
     return { valid: false, reason: "This is not a RAIMOSA license key." };
   const body = key.slice(KEY_PREFIX.length);
@@ -88,6 +92,8 @@ export function verifyLicenseKey(rawKey) {
   } catch {
     return { valid: false, reason: "The license payload is unreadable." };
   }
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload))
+    return { valid: false, reason: "The license payload is unreadable." };
   if (payload.p !== "raimosa")
     return { valid: false, reason: "This key is not for RAIMOSA." };
   if (payload.t !== "pro")

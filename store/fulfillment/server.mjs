@@ -97,10 +97,27 @@ function verifyStripe(raw, headers) {
     header.split(",").map((kv) => kv.split("=").map((s) => s.trim())),
   );
   if (!parts.t || !parts.v1) return false;
+  // Replay protection: a signed webhook older (or newer) than 5 minutes is
+  // refused, matching Stripe's own recommended tolerance. Without this, a
+  // captured webhook could be replayed forever.
+  const ts = Number(parts.t);
+  if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > 300)
+    return false;
   const expected = createHmac("sha256", STRIPE_SECRET)
     .update(`${parts.t}.${raw.toString("utf8")}`)
     .digest("hex");
   return safeEqualHex(parts.v1, expected);
+}
+
+// A minimal sanity check, not RFC 5322: it exists to stop non-email values
+// (Stripe customer ids, arrays, objects) from becoming license holders or
+// Resend recipients.
+function sane(email) {
+  return (
+    typeof email === "string" &&
+    email.length <= 254 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  );
 }
 
 function buyerFromLemonSqueezy(event) {
@@ -108,7 +125,7 @@ function buyerFromLemonSqueezy(event) {
   if (name !== "order_created") return { skip: `ignored event ${name}` };
   const attrs = event?.data?.attributes || {};
   const email = attrs.user_email || attrs.customer_email;
-  if (!email) return { skip: "order_created without an email" };
+  if (!sane(email)) return { skip: "order_created without a valid email" };
   return { email, name: attrs.user_name || email, orderId: event?.data?.id };
 }
 
@@ -116,9 +133,9 @@ function buyerFromStripe(event) {
   const name = event?.type;
   if (name !== "checkout.session.completed") return { skip: `ignored ${name}` };
   const obj = event?.data?.object || {};
-  const email =
-    obj.customer_details?.email || obj.customer_email || obj.customer;
-  if (!email) return { skip: "checkout.session without an email" };
+  // obj.customer is a Stripe customer id ("cus_..."), never an email address.
+  const email = obj.customer_details?.email || obj.customer_email;
+  if (!sane(email)) return { skip: "checkout.session without a valid email" };
   return { email, name: obj.customer_details?.name || email, orderId: obj.id };
 }
 
@@ -154,8 +171,11 @@ async function deliverEmail(to, key, holder) {
 // holds real license keys — keep it beside the signing key (chmod 600 dir).
 function recordSale(entry) {
   try {
-    mkdirSync(path.dirname(OUTBOX), { recursive: true });
-    appendFileSync(OUTBOX, JSON.stringify(entry) + "\n", "utf8");
+    mkdirSync(path.dirname(OUTBOX), { recursive: true, mode: 0o700 });
+    appendFileSync(OUTBOX, JSON.stringify(entry) + "\n", {
+      encoding: "utf8",
+      mode: 0o600,
+    });
   } catch (error) {
     console.error(`  WARN: could not write outbox: ${error.message}`);
   }
