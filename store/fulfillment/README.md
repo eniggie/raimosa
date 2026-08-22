@@ -15,6 +15,36 @@ Buyer clicks "Get Pro" → Lemon Squeezy checkout → payment
 
 Everything below the checkout account is already built and tested.
 
+### ✅ Already done (2026-08-21)
+
+The Lemon Squeezy account and product exist:
+
+| | |
+|---|---|
+| Store | **ECONTEUR LLC** (`econteur.lemonsqueezy.com`) |
+| Product | **RAIMOSA Pro — lifetime license**, id `1307518`, **Published** |
+| Price | **$29.00**, single payment |
+| Tax category | **Software** (downloadable software, not SaaS) |
+| Checkout URL | `https://econteur.lemonsqueezy.com/checkout/buy/5fb7a1e1-6b15-452d-bd87-f8ffb43c78ba` |
+| Wired into | `web/index.html` "Get Pro" (live on the landing page) |
+
+Lemon Squeezy's own **"Generate license keys" is deliberately OFF** — RAIMOSA
+mints its own Ed25519 offline key, and two competing keys would confuse buyers.
+The purchase confirmation tells the buyer their key arrives by email.
+
+**🔴 Two things still block real, automatic sales:**
+
+1. **The store is in Test mode and not activated.** Real cards are refused until
+   the business/payout details are filled in (Activate your store). Owner-only.
+2. **The fulfillment webhook has no public host yet**, so key delivery is manual:
+   open Orders, then run `node tools/sign-license.mjs "buyer@email"` and send the
+   key. Fine at launch volume. To automate, host `store/fulfillment/server.mjs`
+   and add the webhook below.
+
+⚠️ Hosting note: the fulfillment server needs the **private signing key**. Anyone
+holding it can mint unlimited free Pro, so treat putting it on a cloud host as a
+real decision — at low volume, manual minting keeps the key on one machine.
+
 ### 1. Create the product (recommended: Lemon Squeezy)
 
 Lemon Squeezy is the merchant of record — it handles global sales tax/VAT for
