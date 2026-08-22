@@ -5,9 +5,12 @@
   RAIMOSA is a full-trust desktop utility: it spawns a bundled Node runtime,
   controls applications and power, and reads the filesystem. That requires the
   `runFullTrust` restricted capability, which Microsoft grants to packaged
-  desktop apps (unlike the fully-sandboxed Mac App Store). The identity fields
-  below are placeholders — Partner Center assigns the real Publisher and
-  Package identity when the app is reserved; package.ps1 substitutes them.
+  desktop apps (unlike the fully-sandboxed Mac App Store).
+
+  The identity below is the REAL one Partner Center assigned when the name was
+  reserved — it is not a placeholder. package.ps1 only re-stamps the Version to
+  match app/package.json, and overrides Publisher solely when -PublisherCN is
+  passed (for a re-key). See store/windows/IDENTITY.md.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"

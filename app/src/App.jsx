@@ -349,7 +349,7 @@ function HomeView({
           ) : (
             recent.map((entry) => (
               <div className="activity-item" key={entry.id}>
-                {entry.verified ? <CheckCircle /> : <Warning />}
+                {entry.verified ? <CheckCircle /> : <PaperPlaneTilt />}
                 <div>
                   <strong>{entry.tool}</strong>
                   <span>
@@ -700,7 +700,9 @@ function RuntimeLedgerView() {
           <span>
             Receipts are written to an append-only on-disk ledger and survive a
             runtime restart. Each receipt is hash-chained to the one before it
-            {integrity ? `; all ${integrity.checked} verified` : ""}.
+            {integrity ? `; all ${integrity.checked} check out` : ""}. A receipt
+            marked “Dispatched” means the request was accepted by the system but
+            its outcome cannot be observed from inside RAIMOSA.
           </span>
         ) : (
           <span>
@@ -749,7 +751,7 @@ function RuntimeLedgerView() {
                     second: "2-digit",
                   })}
                 </time>
-                <em>{item.verified ? "Verified" : "Unverified"}</em>
+                <em>{item.verified ? "Verified" : "Dispatched"}</em>
               </summary>
               <pre>{JSON.stringify(item.result, null, 2)}</pre>
             </details>

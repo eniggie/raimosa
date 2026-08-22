@@ -152,15 +152,28 @@ export function defaultWorkspace() {
   return path.join(os.homedir(), "RAIMOSA Workspace");
 }
 
-function receipt(tool, scope, result) {
+// `verified` is evidence, not decoration: it means RAIMOSA observed the result,
+// not merely that the call returned without throwing. Adapters that can only
+// hand a request to the operating system — launching or quitting an app,
+// opening a document, posting a notification, sleeping the machine — cannot
+// observe the outcome from inside this runtime, so they must record
+// `verified: false`. Marking those true would make the exported ledger claim
+// proof it does not have.
+function receipt(tool, scope, result, { verified = true } = {}) {
   return {
     id: `RC-${randomUUID().slice(0, 8).toUpperCase()}`,
     tool,
     scope,
     timestamp: new Date().toISOString(),
-    verified: true,
+    verified,
     result,
   };
+}
+
+// A receipt whose result only records that a request was accepted, never that
+// it completed.
+function dispatchReceipt(tool, scope, result) {
+  return receipt(tool, scope, result, { verified: false });
 }
 
 // Remote and pairing records reference the All Access session that authorised
@@ -233,22 +246,38 @@ async function containedPath(root, relativePath, { mustExist = true } = {}) {
   return real;
 }
 
-async function walk(root, { depth = 0, results = [] } = {}) {
+async function walk(root, { depth = 0, results = [], base = root } = {}) {
   if (depth > MAX_DEPTH || results.length >= MAX_FILES) return results;
   const entries = await fs.readdir(root, { withFileTypes: true });
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (entry.name === ".DS_Store" || entry.name.startsWith(".")) continue;
     const absolute = path.join(root, entry.name);
-    const stat = await fs.stat(absolute);
+    // A symlink can point outside the approved root. Following it — even just
+    // to stat its target's size and mtime — leaks the existence and shape of
+    // files the caller never approved. Include a symlink only when its real
+    // target stays inside the approved base; otherwise skip it entirely. This
+    // is the same containment rule preview-file enforces, applied to the walk.
+    if (entry.isSymbolicLink()) {
+      let realTarget;
+      try {
+        realTarget = await fs.realpath(absolute);
+      } catch {
+        continue;
+      }
+      if (realTarget !== base && !realTarget.startsWith(`${base}${path.sep}`))
+        continue;
+    }
+    const stat = await fs.stat(absolute).catch(() => null);
+    if (!stat) continue;
     results.push({
       absolute,
       name: entry.name,
-      type: entry.isDirectory() ? "folder" : "file",
-      size: entry.isDirectory() ? 0 : stat.size,
+      type: stat.isDirectory() ? "folder" : "file",
+      size: stat.isDirectory() ? 0 : stat.size,
       modifiedAt: stat.mtime.toISOString(),
     });
-    if (entry.isDirectory())
-      await walk(absolute, { depth: depth + 1, results });
+    if (stat.isDirectory())
+      await walk(absolute, { depth: depth + 1, results, base });
     if (results.length >= MAX_FILES) break;
   }
   return results;
@@ -644,7 +673,7 @@ async function compareFolders(payload) {
   });
 }
 
-async function readClipboard() {
+async function rawClipboardText() {
   let text = "";
   if (process.platform === "darwin") {
     const { stdout } = await execFileAsync("/usr/bin/pbpaste", [], {
@@ -671,6 +700,11 @@ async function readClipboard() {
     });
     text = stdout;
   }
+  return text;
+}
+
+async function readClipboard() {
+  const text = await rawClipboardText();
   const content = text.slice(0, 16 * 1024);
   return receipt("read-clipboard", "system clipboard", {
     characters: text.length,
@@ -701,11 +735,25 @@ async function writeClipboard(payload) {
         "Writing the clipboard on Linux needs xclip. Install it and try again.",
       );
     });
-  return receipt("write-clipboard", "system clipboard", {
-    characters: bounded.length,
-    truncated: bounded.length < text.length,
-    content: bounded,
-  });
+  // Exit code 0 only proves the helper ran. Read the clipboard back so the
+  // receipt reports an observed result rather than an assumed one.
+  const readBack = await rawClipboardText().catch(() => null);
+  const confirmed =
+    readBack !== null && readBack.replace(/\r\n/g, "\n") === bounded;
+  return receipt(
+    "write-clipboard",
+    "system clipboard",
+    {
+      characters: bounded.length,
+      truncated: bounded.length < text.length,
+      content: bounded,
+      state: confirmed ? "clipboard-confirmed" : "write-dispatched",
+      verification: confirmed
+        ? "The clipboard was read back and matches exactly."
+        : "The write command succeeded but the clipboard could not be read back to confirm it.",
+    },
+    { verified: confirmed },
+  );
 }
 
 async function captureScreen(payload) {
@@ -802,7 +850,7 @@ async function systemPower(payload) {
     await execFileAsync("systemctl", args, { timeout: 15_000 });
   }
 
-  return receipt("system-power", "this device", {
+  return dispatchReceipt("system-power", "this device", {
     action,
     platform: process.platform,
     state: "dispatch-accepted",
@@ -1000,7 +1048,7 @@ async function openWithSystemOpener(target) {
 async function launchApplication(payload) {
   const app = await validateApplication(payload.appPath);
   const adapter = await openWithSystemOpener(app.path);
-  return receipt("launch-application", app.path, {
+  return dispatchReceipt("launch-application", app.path, {
     application: app.name,
     adapter,
     state: "launch-request-accepted",
@@ -1033,7 +1081,7 @@ async function closeApplication(payload) {
     );
     const asked = Number(String(stdout).trim());
     if (!Number.isFinite(asked) || asked === 0) {
-      return receipt("close-application", app.path, {
+      return dispatchReceipt("close-application", app.path, {
         application: app.name,
         windowsAsked: 0,
         state: "no-matching-window",
@@ -1041,7 +1089,7 @@ async function closeApplication(payload) {
           "No running window matched this application, so nothing was closed. A Start Menu shortcut name can differ from the running process name.",
       });
     }
-    return receipt("close-application", app.path, {
+    return dispatchReceipt("close-application", app.path, {
       application: app.name,
       windowsAsked: asked,
       state: "quit-request-accepted",
@@ -1051,7 +1099,7 @@ async function closeApplication(payload) {
       `Quitting applications is not implemented for ${process.platform}.`,
     );
   }
-  return receipt("close-application", app.path, {
+  return dispatchReceipt("close-application", app.path, {
     application: app.name,
     state: "quit-request-accepted",
   });
@@ -1226,7 +1274,7 @@ async function localNotification(payload) {
     );
   }
 
-  return receipt("local-notification", "current desktop user", {
+  return dispatchReceipt("local-notification", "current desktop user", {
     title: rawTitle,
     message: rawMessage,
     platform: process.platform,
@@ -1241,7 +1289,7 @@ async function openDocument(payload) {
   if (!stat.isFile())
     throw new Error("Choose one file inside the approved folder.");
   const adapter = await openWithSystemOpener(file);
-  return receipt("open-document", root, {
+  return dispatchReceipt("open-document", root, {
     path: path.relative(root, file),
     adapter,
     state: "open-request-accepted",
@@ -1530,12 +1578,20 @@ export function createDesktopToolService(options = {}) {
   // revoked and a new one must be generated from the desktop.
   const MAX_PAIR_ATTEMPTS = 5;
   let failedPairAttempts = 0;
+  // After the attempt limit trips, refuse further guesses for a cooldown window.
+  // Revoking the codes alone was not enough: a guesser on the same network could
+  // burn the limit, wait for the owner to generate a fresh code, and repeat
+  // forever — locking the owner out of pairing indefinitely. The cooldown bounds
+  // guessing to MAX_PAIR_ATTEMPTS per window against a 900,000-code space.
+  let pairLockedUntil = 0;
+  const PAIR_LOCKOUT_MS = 60_000;
 
   function startRemotePairing(payload = {}) {
     requireNotLatched();
     requirePro("mobile-remote");
     const access = requireAccess(payload.accessToken);
-    failedPairAttempts = 0;
+    // Deliberately NOT clearing failedPairAttempts here: generating a fresh code
+    // must not hand an active guesser a fresh allowance.
     const code = String(randomInt(100000, 1000000));
     const pairing = {
       id: `PAIR-${randomUUID().slice(0, 8).toUpperCase()}`,
@@ -1568,6 +1624,12 @@ export function createDesktopToolService(options = {}) {
 
   function pairRemote(payload = {}) {
     requireNotLatched();
+    if (Date.now() < pairLockedUntil) {
+      const seconds = Math.ceil((pairLockedUntil - Date.now()) / 1000);
+      throw new Error(
+        `Too many incorrect pairing codes. Try again in ${seconds}s.`,
+      );
+    }
     const code = String(payload.code ?? "").trim();
     const pairing = state.getSession("pairing", code);
     const access = pairing ? liveAccessByHash(pairing.accessTokenHash) : null;
@@ -1585,10 +1647,12 @@ export function createDesktopToolService(options = {}) {
           }),
         );
         failedPairAttempts = 0;
+        pairLockedUntil = Date.now() + PAIR_LOCKOUT_MS;
       }
       throw new Error("The pairing code is invalid or expired.");
     }
     failedPairAttempts = 0;
+    pairLockedUntil = 0;
     state.deleteSession("pairing", code);
     const token = randomUUID();
     const session = {
@@ -1872,6 +1936,23 @@ export function createDesktopToolService(options = {}) {
     // Take single-use ownership before the first file moves. If the runtime
     // dies mid-execution the claim is already on disk, so the same approved
     // plan can never be replayed into duplicate side effects.
+    // The plan receipt publishes this hash as the fingerprint of exactly what
+    // was approved. Recompute it before acting: without this check the hash is
+    // decorative, and a plan altered in the state store between approval and
+    // execution would run anyway under a receipt that still cites the original
+    // fingerprint.
+    const replayHash = createHash("sha256")
+      .update(
+        JSON.stringify({
+          root: approval.root,
+          operations: approval.operations,
+        }),
+      )
+      .digest("hex");
+    if (approval.hash && replayHash !== approval.hash)
+      throw new Error(
+        "This approved plan no longer matches its approved fingerprint. Create a new plan.",
+      );
     if (!state.claimApproval(payload.approvalId))
       throw new Error(
         "This approval was already used. Create a new plan to run it again.",
@@ -1883,7 +1964,20 @@ export function createDesktopToolService(options = {}) {
         const destination = path.resolve(approval.root, operation.destination);
         if (!destination.startsWith(`${approval.root}${path.sep}`))
           throw new Error("A destination leaves the approved folder.");
-        await fs.mkdir(path.dirname(destination), { recursive: true });
+        const parent = path.dirname(destination);
+        await fs.mkdir(parent, { recursive: true });
+        // The string check above cannot see through a symlink. A link planted
+        // inside the approved folder (e.g. "RAIMOSA Organized/Images" ->
+        // /tmp/elsewhere) is silently accepted by mkdir -p, and the rename
+        // would then move the owner's files OUT of the folder they approved
+        // while the receipt still claimed success. Resolve the real parent
+        // after creating it and refuse anything that leaves the root.
+        const realParent = await fs.realpath(parent);
+        if (
+          realParent !== approval.root &&
+          !realParent.startsWith(`${approval.root}${path.sep}`)
+        )
+          throw new Error("A destination leaves the approved folder.");
         await fs
           .access(destination)
           .then(() => {

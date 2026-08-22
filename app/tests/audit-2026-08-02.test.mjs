@@ -152,10 +152,20 @@ test("repeated failed pairing attempts revoke every outstanding code", async () 
     );
   }
 
-  // The lockout revoked the real code too and recorded the event.
+  // Once the limit trips, further guesses are refused outright for a cooldown
+  // window — revoking the codes alone let a guesser burn the limit, wait for a
+  // fresh owner-generated code, and repeat forever.
   assert.throws(
     () => service.pairRemote({ code: pairing.pairing.code }),
-    /invalid or expired/,
+    /Too many incorrect pairing codes/,
+  );
+  // And generating a fresh code must not hand the guesser a new allowance.
+  const reissued = service.startRemotePairing({
+    accessToken: access.session.token,
+  });
+  assert.throws(
+    () => service.pairRemote({ code: reissued.pairing.code }),
+    /Too many incorrect pairing codes/,
   );
   const lockout = service
     .listReceipts(100)
