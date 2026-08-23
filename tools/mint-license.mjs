@@ -29,8 +29,19 @@ export function resolveKeyPath() {
  * Load the Ed25519 private signing key. Throws with a clear message if it is
  * missing — a fulfillment server that cannot sign must fail loud, never mint a
  * fake key.
+ *
+ * A hosted fulfillment server has no home directory to read a .pem from, so the
+ * key may instead be supplied whole in RAIMOSA_LICENSE_KEY_PEM (the host's
+ * secret store). That variable wins when set. Escaped newlines are accepted
+ * because most dashboards mangle real ones on paste.
  */
 export function loadSigningKey(keyPath = resolveKeyPath()) {
+  const inline = process.env.RAIMOSA_LICENSE_KEY_PEM;
+  if (inline && inline.trim()) {
+    return createPrivateKey(
+      inline.includes("\\n") ? inline.replace(/\\n/g, "\n") : inline,
+    );
+  }
   return createPrivateKey(readFileSync(keyPath, "utf8"));
 }
 

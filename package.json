@@ -1,0 +1,11 @@
+{
+  "name": "raimosa-fulfillment",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Deploy target for the RAIMOSA Pro purchase-fulfillment webhook. The desktop app itself lives in app/ and has its own package.json; this file exists so a host can detect and start the fulfillment service, which has no dependencies.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node store/fulfillment/server.mjs"
+  }
+}

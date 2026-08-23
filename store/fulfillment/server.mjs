@@ -38,7 +38,14 @@ const STRIPE_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_EMAIL =
   process.env.RAIMOSA_FROM_EMAIL || "RAIMOSA <hello@raimzy.com>";
-const OUTBOX = path.join(homedir(), ".raimosa-keys", "sales-outbox.jsonl");
+// On a host, the container filesystem is ephemeral, so point this at a mounted
+// volume (RAIMOSA_OUTBOX) if you want the record to survive a redeploy. Losing
+// it is recoverable but not free: the payment provider's order list is the
+// durable record of who bought, and minting is deterministic for a given buyer
+// and issue date, so a key can always be re-derived.
+const OUTBOX =
+  process.env.RAIMOSA_OUTBOX ||
+  path.join(homedir(), ".raimosa-keys", "sales-outbox.jsonl");
 
 // Fail loud at boot if we can't sign — a fulfillment server that can't mint a
 // real key must never start and hand out nothing (or worse, a fake).
@@ -181,6 +188,12 @@ function recordSale(entry) {
   }
 }
 
+// Payment providers retry a webhook until they get a 2xx, and will re-deliver
+// after a timeout. Minting is deterministic, so a retry yields the identical
+// key — but it would email the buyer again. Remember what we have already
+// fulfilled so a retry storm is answered, not re-sent.
+const fulfilledOrders = new Set();
+
 async function handlePurchase(buyer) {
   const { key, payload } = mintLicenseKey(buyer.email, {
     privateKey: SIGNING_KEY,
@@ -196,6 +209,7 @@ async function handlePurchase(buyer) {
     emailNote: delivery.reason || null,
   };
   recordSale(entry);
+  if (buyer.orderId) fulfilledOrders.add(buyer.orderId);
   console.log(
     `  minted Pro for ${buyer.email}` +
       (delivery.sent ? " (emailed)" : ` (NOT emailed: ${delivery.reason})`),
@@ -259,6 +273,12 @@ const server = createServer(async (req, res) => {
 
   const buyer = extract(event);
   if (buyer.skip) return send(200, { ok: true, skipped: buyer.skip });
+  if (buyer.orderId && fulfilledOrders.has(buyer.orderId)) {
+    console.log(
+      `  duplicate delivery for order ${buyer.orderId} — not re-sent`,
+    );
+    return send(200, { ok: true, duplicate: true });
+  }
 
   try {
     const entry = await handlePurchase(buyer);
