@@ -1,0 +1,15 @@
+# The fulfillment service is a single dependency-free file plus tools/.
+# Never ship the desktop build artifacts to it — they are hundreds of megabytes.
+dist-release/
+vendor/
+native/macos/build/
+app/dist/
+app/node_modules/
+node_modules/
+deliverables/
+docs/
+brand/
+web/
+*.dmg
+*.zip
+*.tar.gz

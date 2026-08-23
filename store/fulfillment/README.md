@@ -32,18 +32,50 @@ Lemon Squeezy's own **"Generate license keys" is deliberately OFF** — RAIMOSA
 mints its own Ed25519 offline key, and two competing keys would confuse buyers.
 The purchase confirmation tells the buyer their key arrives by email.
 
-**🔴 Two things still block real, automatic sales:**
+### 🚀 DEPLOYED 2026-08-23
+
+The webhook is live on Railway (project **RAIMOSA**, service **fulfillment**):
+
+| | |
+|---|---|
+| URL | `https://fulfillment-production-5eaf.up.railway.app` |
+| Health | `GET /health` → `canSign:true` |
+| Webhook endpoint | `POST /webhook/lemonsqueezy` |
+| Signing key | `RAIMOSA_LICENSE_KEY_PEM` (Railway variable, never in the repo) |
+| Outbox | `/data/sales-outbox.jsonl` on a mounted 5GB volume, so it survives redeploys |
+| Deploys from | GitHub `eniggie/raimosa`, branch `main`, start `node store/fulfillment/server.mjs` |
+
+Verified against the **live** service, not just locally: a forged signature is
+refused `401`, a genuine signed delivery mints, a retry returns
+`{duplicate:true}` without re-sending, the sale is written to the volume, and
+the key minted **in production** verifies as a valid Pro licence.
+
+🔑 `railway variables --set` takes a minute or two to cut over — the old
+container keeps serving until then. Do not assume a rotated secret is live;
+poll until the old value is actually rejected.
+
+⚠️ `LEMONSQUEEZY_SIGNING_SECRET` currently holds an unguessable **placeholder**,
+so nothing can mint until it is replaced with the real secret from the Lemon
+Squeezy webhook below. That is deliberate: an endpoint that can mint must never
+sit behind a secret anyone has seen.
+
+**🔴 Three things still block real, automatic sales:**
 
 1. **The store is in Test mode and not activated.** Real cards are refused until
    the business/payout details are filled in (Activate your store). Owner-only.
-2. **The fulfillment webhook has no public host yet**, so key delivery is manual:
-   open Orders, then run `node tools/sign-license.mjs "buyer@email"` and send the
-   key. Fine at launch volume. To automate, host `store/fulfillment/server.mjs`
-   and add the webhook below.
+2. **The Lemon Squeezy webhook does not exist yet.** Create it at Settings →
+   Webhooks with URL `https://fulfillment-production-5eaf.up.railway.app/webhook/lemonsqueezy`,
+   event **`order_created`**, then put its signing secret into Railway:
+   `railway variables --set "LEMONSQUEEZY_SIGNING_SECRET=<secret>"`.
+3. **No email provider is configured**, so a minted key is recorded but not sent.
+   Add a [Resend](https://resend.com) API key as `RESEND_API_KEY` to deliver
+   automatically. Until then, read a pending key with:
+   `railway volume files -v fulfillment-volume download /sales-outbox.jsonl`.
 
-⚠️ Hosting note: the fulfillment server needs the **private signing key**. Anyone
-holding it can mint unlimited free Pro, so treat putting it on a cloud host as a
-real decision — at low volume, manual minting keeps the key on one machine.
+⚠️ The private signing key now lives on Railway as a variable. Anyone holding it
+can mint unlimited free Pro — treat it like a payment credential, and rotate it
+(and the embedded public key in `app/server/licensing.mjs`) if it is ever
+exposed.
 
 ### 1. Create the product (recommended: Lemon Squeezy)
 
