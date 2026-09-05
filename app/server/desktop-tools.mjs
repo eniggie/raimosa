@@ -12,6 +12,10 @@ import { createSentinel } from "./sentinel.mjs";
 import { providerSummary, registerProvider } from "./providers.mjs";
 import { createVault } from "./vault.mjs";
 import { createOpenAIProvider } from "./providers/openai.mjs";
+import { createAnthropicProvider } from "./providers/anthropic.mjs";
+import { route as routeProvider } from "./providers.mjs";
+import { createMemory } from "./memory.mjs";
+import { answer as narrate } from "./narrator.mjs";
 import {
   verifyLicenseKey,
   requiresPro,
@@ -1416,12 +1420,24 @@ export function createDesktopToolService(options = {}) {
   // Sentinel shares the durable state file and writes every decision to the
   // same ledger as every other action. It is given only what it needs: the
   // latch, the symlink-safe root resolver, and the live-access lookup.
+  // Memory holds facts, never secrets; Sentinel writes verification memory
+  // through a hook so an agent can never author its own track record.
+  const memory = createMemory({ stateFile: state.file, record, receipt });
   const sentinel = createSentinel({
     stateFile: state.file,
     record,
     receipt,
     isLatched: () => Boolean(state.getFlag("emergency-stop")),
     approvedRoot,
+    hooks: {
+      onVerified: (info) => memory.recordVerification(info),
+      // Sentinel's own warnings are POLICY-originated, so they may post a
+      // local desktop notification without an All Access session. Best-effort.
+      onNotify: (n) =>
+        void sendLocalNotification({ title: n.title, message: n.body }).catch(
+          () => {},
+        ),
+    },
   });
 
   // The credential vault brokers the OS keychain. RAIMOSA's DB holds names
@@ -1435,6 +1451,7 @@ export function createDesktopToolService(options = {}) {
   // Provider adapters read their keys from the vault in-process and report
   // configured:false until one exists. Registering is idempotent.
   registerProvider(createOpenAIProvider({ vault }));
+  registerProvider(createAnthropicProvider({ vault }));
 
   function emergencyStatus() {
     const latch = state.getFlag("emergency-stop");
@@ -2291,6 +2308,82 @@ export function createDesktopToolService(options = {}) {
     },
     recovery,
     sentinel,
+    memory,
+    memoryStatus() {
+      return { ok: true, ...memory.status(), memories: memory.recall() };
+    },
+    memoryRemember(payload = {}) {
+      requireNotLatched();
+      return {
+        ok: true,
+        memory: memory.remember({ ...payload, source: "owner" }),
+      };
+    },
+    memoryForget(payload = {}) {
+      return { ok: true, ...memory.forget(payload.id) };
+    },
+    memoryClear(payload = {}) {
+      requireAccess(payload.accessToken);
+      if (payload.confirmation !== "CONFIRM")
+        throw new Error('Type "CONFIRM" to clear all memory.');
+      return { ok: true, ...memory.forgetAll() };
+    },
+    memorySetEnabled(payload = {}) {
+      requireAccess(payload.accessToken);
+      return { ok: true, ...memory.setEnabled(Boolean(payload.enabled)) };
+    },
+    memoryExport() {
+      return {
+        ok: true,
+        filename: `raimosa-memory-${new Date().toISOString().slice(0, 10)}.json`,
+        content: JSON.stringify(memory.exportAll(), null, 2),
+      };
+    },
+    /** OVIA AI answers from records only; no model is consulted here. */
+    async oviaAsk(payload = {}) {
+      const status = await this.sentinelStatus();
+      const receipts = ledger.query({ limit: 500 });
+      const facts = narrate(payload.question, { status, receipts });
+      // With a configured text provider, OVIA AI may phrase the answer more
+      // naturally — but only from the facts established above. The model
+      // never sees a secret or raw agent text, and cannot promote a claim to
+      // a result: the facts already carry that distinction.
+      const chosen = routeProvider({ kind: "text" });
+      if (!chosen.provider || facts.kind === "empty")
+        return { ok: true, ...facts, phrasedBy: null };
+      try {
+        const out = await chosen.provider.complete({
+          system:
+            "You are OVIA AI, the voice of RAIMOSA. Rephrase the FACTS below for the owner in two or three plain sentences. " +
+            "Rules you may not break: state only what the facts say; keep 'reported/claimed' and 'verified' distinct exactly as given; " +
+            "if a fact says something is unverified, say so; never add capabilities, promises, or details not in the facts; no secrets, no code.",
+          input: `Question: ${String(payload.question ?? "").slice(0, 500)}\n\nFACTS:\n- ${facts.lines.join("\n- ")}`,
+          maxOutputTokens: 400,
+          effort: "low",
+        });
+        if (out.refused || !out.text?.trim())
+          return { ok: true, ...facts, phrasedBy: null };
+        return {
+          ok: true,
+          kind: facts.kind,
+          lines: [out.text.trim()],
+          facts: facts.lines,
+          phrasedBy: chosen.provider.id,
+        };
+      } catch {
+        // A provider failure never hides the facts.
+        return { ok: true, ...facts, phrasedBy: null };
+      }
+    },
+    queryReceipts(params = {}) {
+      return {
+        ok: true,
+        receipts: ledger.query(params),
+        integrity: ledger.verify(),
+        durable: ledger.durable,
+      };
+    },
+    ledgerCount: () => ledger.count(),
     vault,
     vaultStatus() {
       return { ok: true, ...vault.status(), secrets: vault.list() };
@@ -2349,6 +2442,7 @@ export function createDesktopToolService(options = {}) {
       return { ok: true, ...sentinel.status({ discovered }), discovered };
     },
     closeLedger() {
+      memory.close();
       vault.close();
       sentinel.close();
       ledger.close();

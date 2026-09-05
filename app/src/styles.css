@@ -4012,3 +4012,16 @@ summary:focus-visible {
   gap: 8px;
   margin-top: 6px;
 }
+
+.emoji-icon {
+  display: inline-flex;
+  line-height: 1;
+  filter: saturate(1.1);
+}
+.sidenav button .emoji-icon {
+  font-size: 22px;
+}
+.ovia-title .emoji-icon,
+.ovia-restore .emoji-icon {
+  margin-right: 6px;
+}

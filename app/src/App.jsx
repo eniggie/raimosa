@@ -47,16 +47,29 @@ import { RemoteView } from "./views/RemoteView.jsx";
 import { ToolsView } from "./views/ToolsView.jsx";
 import { SentinelView } from "./views/SentinelView.jsx";
 import { VaultView } from "./views/VaultView.jsx";
+import { MemoryView } from "./views/MemoryView.jsx";
+import { SecurityView } from "./views/SecurityView.jsx";
+
+// OVIA AI is the voice: its icon is a mouth.
+function Lips({ size = 22 }) {
+  return (
+    <span className="emoji-icon" style={{ fontSize: size }} aria-hidden="true">
+      👄
+    </span>
+  );
+}
 
 const nav = [
   ["Home", House],
   ["Sentinel", ShieldCheck],
-  ["Intelligence", Sparkle],
+  ["OVIA AI", Lips],
   ["Tools", Wrench],
   ["Remote", DeviceMobile],
   ["Ledger", BookOpen],
   ["Permissions", LockKey],
   ["Vault", Fingerprint],
+  ["Memory", NotePencil],
+  ["Security", ShieldWarning],
   ["Settings", GearSix],
 ];
 
@@ -883,14 +896,24 @@ function Ovia({ access, command, onAccess, onEnd, collapsed, onToggle }) {
       { id: Date.now(), text, time: "You" },
     ]);
     if (mode === "Ask") {
-      setMessages((current) => [
-        ...current,
-        {
-          id: Date.now() + 1,
-          text: "External model reasoning is not configured. I can still compile governed local plans, run verified adapters, and show receipts.",
-          time: "OVIA AI",
-        },
-      ]);
+      // OVIA AI answers from Sentinel's records and the ledger. No model is
+      // consulted, so an agent's claim can never be read back as a result.
+      try {
+        const reply = await desktopApi.oviaAsk(text);
+        setMessages((current) => [
+          ...current,
+          { id: Date.now() + 1, text: reply.lines.join(" "), time: "OVIA AI" },
+        ]);
+      } catch (askError) {
+        setMessages((current) => [
+          ...current,
+          {
+            id: Date.now() + 1,
+            text: `I could not read Sentinel's records: ${askError.message}`,
+            time: "OVIA AI",
+          },
+        ]);
+      }
       return;
     }
     try {
@@ -925,7 +948,7 @@ function Ovia({ access, command, onAccess, onEnd, collapsed, onToggle }) {
           onClick={onToggle}
           aria-label="Open OVIA AI"
         >
-          <img src="/assets/raimosa-r-emblem.png" alt="" />
+          <Lips size={20} />
           <span>OVIA AI</span>
           <SidebarSimple size={20} />
         </button>
@@ -937,7 +960,7 @@ function Ovia({ access, command, onAccess, onEnd, collapsed, onToggle }) {
     <aside className="ovia" aria-label="OVIA AI">
       <div className="ovia-title">
         <span>
-          <img src="/assets/raimosa-r-emblem.png" alt="" />
+          <Lips size={20} />
           OVIA AI
         </span>
         <button type="button" aria-label="Minimize OVIA AI" onClick={onToggle}>
@@ -1414,7 +1437,7 @@ export function App() {
       />
     );
   if (active === "Ledger") workspace = <RuntimeLedgerView />;
-  if (active === "Intelligence")
+  if (active === "OVIA AI")
     workspace = (
       <IntelligenceView
         initialCommand={command}
@@ -1429,6 +1452,15 @@ export function App() {
         onAnnouncement={setAnnouncement}
       />
     );
+  if (active === "Memory")
+    workspace = (
+      <MemoryView
+        accessToken={access.token}
+        onRequestAccess={() => setAccessModal(true)}
+        onAnnouncement={setAnnouncement}
+      />
+    );
+  if (active === "Security") workspace = <SecurityView />;
   if (active === "Vault")
     workspace = (
       <VaultView
@@ -1486,7 +1518,7 @@ export function App() {
         onStop={requestStop}
         onCommand={(text) => {
           setCommand({ id: Date.now(), text, source: "global" });
-          setActive("Intelligence");
+          setActive("OVIA AI");
           setOviaCollapsed(false);
           resetViewportScroll();
           setAnnouncement("Command loaded into the OVIA AI Core compiler.");

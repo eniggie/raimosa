@@ -135,6 +135,32 @@ export function createLedger(file) {
       return selectPage.all(bounded).map(toReceipt);
     },
 
+    /**
+     * Ask the ledger a question: receipts since a time, and/or whose tool,
+     * scope, or recorded result mention a term. Read-only; the chain is
+     * untouched. Used for "what happened yesterday?" and "what did Codex do?".
+     */
+    query({ limit = 100, since = null, text = "" } = {}) {
+      const bounded = Math.max(1, Math.min(500, Number(limit) || 100));
+      const needle = String(text ?? "")
+        .trim()
+        .toLowerCase();
+      const from = since ? Date.parse(since) : null;
+      return selectAll
+        .all()
+        .map(toReceipt)
+        .filter((r) => (from ? Date.parse(r.timestamp) >= from : true))
+        .filter((r) =>
+          needle
+            ? `${r.tool} ${r.scope} ${JSON.stringify(r.result ?? {})}`
+                .toLowerCase()
+                .includes(needle)
+            : true,
+        )
+        .reverse()
+        .slice(0, bounded);
+    },
+
     count() {
       return selectCount.get().total;
     },

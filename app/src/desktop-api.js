@@ -37,6 +37,24 @@ export const desktopApi = {
   endRemote: (token) => request("/remote/end", { token }),
   runRemote: (tool, remoteToken, payload = {}) =>
     request(`/remote/tools/${tool}`, { ...payload, remoteToken }),
+  // Memory
+  memoryStatus: () => request("/memory/status", {}),
+  memoryRemember: (entry) => request("/memory/remember", entry),
+  memoryForget: (id) => request("/memory/forget", { id }),
+  memoryClear: (accessToken) =>
+    request("/memory/clear", { accessToken, confirmation: "CONFIRM" }),
+  memorySetEnabled: (enabled, accessToken) =>
+    request("/memory/enabled", { enabled, accessToken }),
+  memoryExport: () => request("/memory/export", {}),
+  // OVIA AI — answers from records only
+  oviaAsk: (question) => request("/ovia/ask", { question }),
+  receiptsQuery: ({ since, q, limit } = {}) => {
+    const params = new URLSearchParams();
+    if (since) params.set("since", since);
+    if (q) params.set("q", q);
+    if (limit) params.set("limit", String(limit));
+    return request(`/receipts?${params.toString()}`);
+  },
   // Credential vault — values are never returned by any route.
   vaultStatus: () => request("/vault/status", {}),
   vaultPut: (name, secret, purpose, accessToken) =>
@@ -60,6 +78,22 @@ export const desktopApi = {
     request("/sentinel/tasks/claim", { taskId, ...claim }),
   sentinelVerify: (taskId, checks, root) =>
     request("/sentinel/tasks/verify", { taskId, checks, root }),
+  sentinelStep: (taskId, step) =>
+    request("/sentinel/tasks/step", { taskId, ...step }),
+  sentinelProgress: (taskId, progress, note) =>
+    request("/sentinel/tasks/progress", { taskId, progress, note }),
+  sentinelSteps: (taskId) => request("/sentinel/tasks/steps", { taskId }),
+  sentinelPriority: (taskId, priority) =>
+    request("/sentinel/tasks/priority", { taskId, priority }),
+  sentinelCancel: (taskId, reason) =>
+    request("/sentinel/tasks/cancel", { taskId, reason }),
+  sentinelProof: (taskId) => request("/sentinel/tasks/proof", { taskId }),
+  remoteSentinelCancel: (remoteToken, taskId) =>
+    request("/remote/sentinel/cancel", { remoteToken, taskId }),
+  remoteSentinelPriority: (remoteToken, taskId, priority) =>
+    request("/remote/sentinel/priority", { remoteToken, taskId, priority }),
+  remoteSentinelProof: (remoteToken, taskId) =>
+    request("/remote/sentinel/proof", { remoteToken, taskId }),
   sentinelVerifications: (taskId) =>
     request("/sentinel/tasks/verifications", { taskId }),
   sentinelRequestApproval: (approval) =>

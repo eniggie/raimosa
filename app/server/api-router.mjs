@@ -109,7 +109,55 @@ export function createApiHandler({ getPort, service: injected } = {}) {
         return;
       }
       if (req.method === "GET" && route === "/receipts") {
+        const params = new URL(req.url ?? "/", "http://localhost").searchParams;
+        if (params.has("since") || params.has("q") || params.has("limit")) {
+          send(
+            res,
+            200,
+            service.queryReceipts({
+              since: params.get("since"),
+              text: params.get("q") ?? "",
+              limit: params.get("limit") ?? 100,
+            }),
+          );
+          return;
+        }
         send(res, 200, service.listReceipts());
+        return;
+      }
+      // Realtime: a server-sent stream of new receipts. Same loopback gate as
+      // every other desktop route; nothing is pushed that /receipts would not
+      // return. The client falls back to polling if the stream closes.
+      if (req.method === "GET" && route === "/events") {
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        });
+        let lastCount = service.ledgerCount();
+        res.write(
+          `event: hello\ndata: ${JSON.stringify({ count: lastCount })}\n\n`,
+        );
+        const tick = setInterval(() => {
+          try {
+            const count = service.ledgerCount();
+            if (count > lastCount) {
+              const fresh = service.listReceipts(
+                Math.min(20, count - lastCount),
+              ).receipts;
+              lastCount = count;
+              for (const r of fresh.reverse())
+                res.write(`event: receipt\ndata: ${JSON.stringify(r)}\n\n`);
+            } else {
+              res.write(`: keep-alive\n\n`);
+            }
+          } catch {
+            // The stream ends on any error; the client re-polls.
+            clearInterval(tick);
+            res.end();
+          }
+        }, 1000);
+        req.on("close", () => clearInterval(tick));
         return;
       }
       if (req.method !== "POST") {
@@ -184,10 +232,12 @@ export function createApiHandler({ getPort, service: injected } = {}) {
         return;
       }
       if (route === "/sentinel/tasks/create") {
-        send(res, 200, {
-          ok: true,
-          task: service.sentinel.createTask(payload),
-        });
+        const created = service.sentinel.createTask(payload);
+        // Anchor a restore point before the agent touches anything.
+        const restorePoint = await service.sentinel.recordRestorePoint(
+          created.id,
+        );
+        send(res, 200, { ok: true, task: { ...created, restorePoint } });
         return;
       }
       if (route === "/sentinel/tasks/claim") {
@@ -201,6 +251,48 @@ export function createApiHandler({ getPort, service: injected } = {}) {
         send(res, 200, {
           ok: true,
           task: await service.sentinel.verifyTask(payload.taskId, payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/step") {
+        send(res, 200, {
+          ok: true,
+          ...service.sentinel.reportStep(payload.taskId, payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/progress") {
+        send(res, 200, {
+          ok: true,
+          ...service.sentinel.reportProgress(payload.taskId, payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/steps") {
+        send(res, 200, {
+          ok: true,
+          steps: service.sentinel.stepsFor(payload.taskId),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/priority") {
+        send(res, 200, {
+          ok: true,
+          task: service.sentinel.setPriority(payload.taskId, payload.priority),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/cancel") {
+        send(res, 200, {
+          ok: true,
+          task: service.sentinel.cancelTask(payload.taskId, payload.reason),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/proof") {
+        send(res, 200, {
+          ok: true,
+          proof: service.sentinel.proofRecord(payload.taskId),
         });
         return;
       }
@@ -236,6 +328,36 @@ export function createApiHandler({ getPort, service: injected } = {}) {
       }
       if (route === "/vault/remove") {
         send(res, 200, await service.vaultRemove(payload));
+        return;
+      }
+      // ---- Memory ----
+      if (route === "/memory/status") {
+        send(res, 200, service.memoryStatus());
+        return;
+      }
+      if (route === "/memory/remember") {
+        send(res, 200, service.memoryRemember(payload));
+        return;
+      }
+      if (route === "/memory/forget") {
+        send(res, 200, service.memoryForget(payload));
+        return;
+      }
+      if (route === "/memory/clear") {
+        send(res, 200, service.memoryClear(payload));
+        return;
+      }
+      if (route === "/memory/enabled") {
+        send(res, 200, service.memorySetEnabled(payload));
+        return;
+      }
+      if (route === "/memory/export") {
+        send(res, 200, service.memoryExport());
+        return;
+      }
+      // ---- OVIA AI (records-only answers) ----
+      if (route === "/ovia/ask") {
+        send(res, 200, await service.oviaAsk(payload));
         return;
       }
       if (route === "/license/status") {
@@ -296,6 +418,30 @@ export function createApiHandler({ getPort, service: injected } = {}) {
       }
       if (route === "/remote/sentinel/status") {
         send(res, 200, await service.remoteSentinelStatus(payload.remoteToken));
+        return;
+      }
+      if (route === "/remote/sentinel/cancel") {
+        await service.remoteSentinelStatus(payload.remoteToken);
+        send(res, 200, {
+          ok: true,
+          task: service.sentinel.cancelTask(payload.taskId, "mobile-remote"),
+        });
+        return;
+      }
+      if (route === "/remote/sentinel/priority") {
+        await service.remoteSentinelStatus(payload.remoteToken);
+        send(res, 200, {
+          ok: true,
+          task: service.sentinel.setPriority(payload.taskId, payload.priority),
+        });
+        return;
+      }
+      if (route === "/remote/sentinel/proof") {
+        await service.remoteSentinelStatus(payload.remoteToken);
+        send(res, 200, {
+          ok: true,
+          proof: service.sentinel.proofRecord(payload.taskId),
+        });
         return;
       }
       if (route === "/remote/sentinel/decide") {

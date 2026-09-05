@@ -28,7 +28,7 @@ its own.
 ## Using it
 
 Store `OPENAI_API_KEY` in the Vault screen and the OpenAI provider adapter
-reports `configured:true`; until then OVIA stays honest and local.
+reports `configured:true`; until then OVIA AI stays honest and local.
 
 Known limit: `security add-generic-password -w` passes the value as a process
 argument, which is briefly visible to other processes running as the same

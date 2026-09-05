@@ -148,6 +148,54 @@ const TOOLS = [
     run: (a) => api("/sentinel/tasks/verify", a),
   },
   {
+    name: "sentinel_report_step",
+    description:
+      "Report what you are doing as you go so the proof record is complete: kind 'action' (what you did), 'command' (a command you ran), 'file' (a file you changed), 'error' (something that failed), or 'note'. Recorded as agent-reported; it never changes task status.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        taskId: str,
+        agentId: str,
+        kind: {
+          type: "string",
+          enum: ["action", "command", "file", "error", "note"],
+        },
+        detail: str,
+      },
+      required: ["taskId", "kind", "detail"],
+      additionalProperties: false,
+    },
+    run: (a) => api("/sentinel/tasks/step", a),
+  },
+  {
+    name: "sentinel_report_progress",
+    description:
+      "Report your estimated progress (0-100) on a task. Shown to the owner as agent-reported progress, not verified.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        taskId: str,
+        progress: { type: "integer", minimum: 0, maximum: 100 },
+        note: str,
+      },
+      required: ["taskId", "progress"],
+      additionalProperties: false,
+    },
+    run: (a) => api("/sentinel/tasks/progress", a),
+  },
+  {
+    name: "sentinel_proof_record",
+    description:
+      "Read the full proof record for a task: original instruction, acceptance criteria, what you reported, and what Sentinel verified — each labelled by who established it.",
+    inputSchema: {
+      type: "object",
+      properties: { taskId: str },
+      required: ["taskId"],
+      additionalProperties: false,
+    },
+    run: (a) => api("/sentinel/tasks/proof", a),
+  },
+  {
     name: "sentinel_request_approval",
     description:
       "Request the owner's approval before a Level 2 or Level 3 action (install software, send email, change config, anything irreversible). Returns an approvalId with status 'pending'. You cannot approve it yourself; poll sentinel_approval_status.",

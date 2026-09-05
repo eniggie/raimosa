@@ -90,8 +90,20 @@ export function SentinelView({ accessToken, onRequestAccess, onAnnouncement }) {
 
   useEffect(() => {
     void refresh();
-    const id = window.setInterval(() => void refresh(), 5000);
-    return () => window.clearInterval(id);
+    // Realtime: refresh the moment a new receipt lands. Polling stays as the
+    // fallback so a closed stream never leaves the page stale.
+    const id = window.setInterval(() => void refresh(), 15000);
+    let source = null;
+    try {
+      source = new EventSource("/api/raimosa/events");
+      source.addEventListener("receipt", () => void refresh());
+    } catch {
+      source = null;
+    }
+    return () => {
+      window.clearInterval(id);
+      source?.close();
+    };
   }, [refresh]);
 
   async function act(label, fn) {
@@ -465,9 +477,63 @@ export function SentinelView({ accessToken, onRequestAccess, onAnnouncement }) {
                     {t.root ?? "no root"} · {t.acceptance.length} acceptance
                     criteria
                     {t.claim ? ` · claim: “${t.claim.summary || "done"}”` : ""}
+                    {t.progress ? ` · ${t.progress}% (agent-reported)` : ""}
+                    {t.priority !== "normal" ? ` · ${t.priority}` : ""}
                   </span>
                 </div>
                 <div className="sentinel-actions">
+                  {t.status !== "CANCELLED" &&
+                    t.status !== "VERIFIED_COMPLETE" && (
+                      <>
+                        <select
+                          aria-label={`Priority for ${t.title}`}
+                          value={t.priority}
+                          onChange={(e) =>
+                            void act(`${t.title} → ${e.target.value}`, () =>
+                              desktopApi.sentinelPriority(t.id, e.target.value),
+                            )
+                          }
+                        >
+                          {["low", "normal", "high", "urgent"].map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={Boolean(busy)}
+                          onClick={() =>
+                            void act(`Cancelled ${t.title}`, () =>
+                              desktopApi.sentinelCancel(t.id, "owner-request"),
+                            )
+                          }
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                  {advanced && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={Boolean(busy)}
+                      onClick={() =>
+                        void desktopApi
+                          .sentinelProof(t.id)
+                          .then((r) =>
+                            setDetails((d) => ({
+                              ...d,
+                              [`proof:${t.id}`]: r.proof,
+                            })),
+                          )
+                          .catch((e) => setError(e.message))
+                      }
+                    >
+                      Proof
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="secondary"
@@ -547,6 +613,54 @@ export function SentinelView({ accessToken, onRequestAccess, onAnnouncement }) {
                   })}
                 </div>
               </div>
+              {advanced && details[`proof:${t.id}`] && (
+                <div className="sentinel-evidence">
+                  {(() => {
+                    const pr = details[`proof:${t.id}`];
+                    const rows = [
+                      ["Instruction", pr.originalInstruction],
+                      ["Acceptance", pr.acceptanceCriteria.join("; ") || "—"],
+                      [
+                        "Actions (agent-reported)",
+                        pr.actionsTaken.map((x) => x.detail).join("; ") || "—",
+                      ],
+                      [
+                        "Commands (agent-reported)",
+                        pr.commandsExecuted.map((x) => x.detail).join("; ") ||
+                          "—",
+                      ],
+                      [
+                        "Files (agent-reported)",
+                        pr.filesModified.map((x) => x.detail).join("; ") || "—",
+                      ],
+                      [
+                        "Errors (agent-reported)",
+                        pr.errors.map((x) => x.detail).join("; ") || "—",
+                      ],
+                      [
+                        "Restore point (verified)",
+                        pr.restorePoint
+                          ? `${pr.restorePoint.head.slice(0, 12)} · ${pr.restorePoint.changedFiles} dirty`
+                          : "none",
+                      ],
+                      [
+                        "Verifications (verified)",
+                        pr.verifications.map((v) => v.outcome).join(", ") ||
+                          "none yet",
+                      ],
+                      ["Final status", pr.finalStatus],
+                    ];
+                    return rows.map(([k, v]) => (
+                      <div className="activity-item" key={k}>
+                        <div>
+                          <strong>{k}</strong>
+                          <span>{v}</span>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
               {advanced && details[t.id]?.length > 0 && (
                 <div className="sentinel-evidence">
                   {details[t.id][0].checks.map((c) => (

@@ -31,6 +31,7 @@ export const TASK_STATUS = Object.freeze({
   FAILED: "FAILED",
   BLOCKED: "BLOCKED",
   REQUIRES_HUMAN_REVIEW: "REQUIRES_HUMAN_REVIEW",
+  CANCELLED: "CANCELLED",
 });
 
 // The honesty vocabulary. Every piece of evidence Sentinel reports carries one
@@ -183,6 +184,27 @@ CREATE TABLE IF NOT EXISTS sentinel_policy (
   level  INTEGER NOT NULL,
   set_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sentinel_steps (
+  id        TEXT PRIMARY KEY,
+  task_id   TEXT NOT NULL,
+  agent_id  TEXT,
+  kind      TEXT NOT NULL,
+  detail    TEXT NOT NULL,
+  at        INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sentinel_task_meta (
+  task_id   TEXT PRIMARY KEY,
+  progress  INTEGER NOT NULL DEFAULT 0,
+  priority  TEXT NOT NULL DEFAULT 'normal',
+  cancelled INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS sentinel_restore_points (
+  task_id       TEXT PRIMARY KEY,
+  head          TEXT,
+  changed_files INTEGER,
+  receipt_id    TEXT,
+  at            INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sentinel_usage (
   id        TEXT PRIMARY KEY,
   agent_id  TEXT NOT NULL,
@@ -210,10 +232,17 @@ export function createSentinel({
   receipt,
   isLatched,
   approvedRoot,
+  hooks = {},
 }) {
   const db = new DatabaseSync(stateFile);
   if (stateFile !== ":memory:") db.exec("PRAGMA journal_mode = WAL;");
   db.exec(SCHEMA);
+  // Additive column for a per-day cap; older DBs get it on first open.
+  try {
+    db.exec("ALTER TABLE sentinel_agents ADD COLUMN budget_usd_daily REAL");
+  } catch {
+    // already present
+  }
 
   const q = {
     putAgent: db.prepare(
@@ -268,6 +297,26 @@ export function createSentinel({
       "INSERT OR REPLACE INTO sentinel_policy (tool, level, set_at) VALUES (?,?,?)",
     ),
     listPolicy: db.prepare("SELECT * FROM sentinel_policy"),
+    putStep: db.prepare(
+      "INSERT INTO sentinel_steps (id, task_id, agent_id, kind, detail, at) VALUES (?,?,?,?,?,?)",
+    ),
+    listSteps: db.prepare(
+      "SELECT * FROM sentinel_steps WHERE task_id = ? ORDER BY at ASC LIMIT 500",
+    ),
+    getMeta: db.prepare("SELECT * FROM sentinel_task_meta WHERE task_id = ?"),
+    putMeta: db.prepare(
+      `INSERT INTO sentinel_task_meta (task_id, progress, priority, cancelled) VALUES (?,?,?,?)
+       ON CONFLICT(task_id) DO UPDATE SET progress = excluded.progress, priority = excluded.priority, cancelled = excluded.cancelled`,
+    ),
+    usageSince: db.prepare(
+      "SELECT COALESCE(SUM(usd),0) AS usd FROM sentinel_usage WHERE agent_id = ? AND at >= ?",
+    ),
+    putRestore: db.prepare(
+      "INSERT OR REPLACE INTO sentinel_restore_points (task_id, head, changed_files, receipt_id, at) VALUES (?,?,?,?,?)",
+    ),
+    getRestore: db.prepare(
+      "SELECT * FROM sentinel_restore_points WHERE task_id = ?",
+    ),
     putUsage: db.prepare(
       "INSERT INTO sentinel_usage (id,agent_id,tokens,usd,note,at) VALUES (?,?,?,?,?,?)",
     ),
@@ -296,6 +345,7 @@ export function createSentinel({
       root: row.root,
       allowlist: parse(row.allowlist, []),
       budgetUsd: row.budget_usd,
+      budgetUsdDaily: row.budget_usd_daily ?? null,
       status: row.status,
       risk: row.risk,
       registeredAt: new Date(row.registered_at).toISOString(),
@@ -316,6 +366,20 @@ export function createSentinel({
       claim: row.claim ? parse(row.claim, null) : null,
       createdAt: new Date(row.created_at).toISOString(),
       updatedAt: new Date(row.updated_at).toISOString(),
+      progress: q.getMeta.get(row.id)?.progress ?? 0,
+      priority: q.getMeta.get(row.id)?.priority ?? "normal",
+      cancelled: Boolean(q.getMeta.get(row.id)?.cancelled),
+      restorePoint: (() => {
+        const rp = q.getRestore.get(row.id);
+        return rp
+          ? {
+              head: rp.head,
+              changedFiles: rp.changed_files,
+              receiptId: rp.receipt_id,
+              at: new Date(rp.at).toISOString(),
+            }
+          : null;
+      })(),
     };
   }
   function hydrateApproval(row) {
@@ -452,6 +516,10 @@ export function createSentinel({
       t,
       null,
     );
+    if (input.budgetUsdDaily !== undefined && input.budgetUsdDaily !== null)
+      db.prepare(
+        "UPDATE sentinel_agents SET budget_usd_daily = ? WHERE id = ?",
+      ).run(Number(input.budgetUsdDaily), agent.id);
     record(
       receipt("sentinel-agent-registered", agent.name, {
         agentId: agent.id,
@@ -530,8 +598,21 @@ export function createSentinel({
     );
     q.touchAgent.run(now(), agentId);
     const spent = q.usageFor.get(agentId, now() - 30 * 24 * 3600 * 1000);
-    const overBudget = agent.budgetUsd !== null && spent.usd > agent.budgetUsd;
+    const today = q.usageSince.get(agentId, now() - 24 * 3600 * 1000);
+    const overBudget =
+      (agent.budgetUsd !== null && spent.usd > agent.budgetUsd) ||
+      (agent.budgetUsdDaily !== null && today.usd > agent.budgetUsdDaily);
     if (overBudget && agent.status !== "paused") {
+      try {
+        hooks.onNotify?.({
+          kind: "budget-exceeded",
+          title: `${agent.name} exceeded its budget`,
+          body: "The agent is paused.",
+          priority: "high",
+        });
+      } catch {
+        // best-effort
+      }
       setAgentStatus(
         agentId,
         "paused",
@@ -539,7 +620,12 @@ export function createSentinel({
         "sentinel-budget-exceeded",
       );
     }
-    return { spentUsd: spent.usd, spentTokens: spent.tokens, overBudget };
+    return {
+      spentUsd: spent.usd,
+      spentTokens: spent.tokens,
+      spentTodayUsd: today.usd,
+      overBudget,
+    };
   }
 
   /**
@@ -779,6 +865,7 @@ export function createSentinel({
     }
     const task = hydrateTask(q.getTask.get(taskId));
     if (!task) throw new Error("Unknown task.");
+    if (task.cancelled) throw new Error("This task was cancelled.");
     const rootInput = input.root ?? task.root;
     if (!rootInput)
       throw new Error("A task must have an approved root to be verified in.");
@@ -826,8 +913,19 @@ export function createSentinel({
             r.agent_id === agent.id &&
             r.outcome !== TASK_STATUS.VERIFIED_COMPLETE,
         ).length;
-      if (recentFailures + 1 >= REPEATED_FAILURE_LIMIT)
+      if (recentFailures + 1 >= REPEATED_FAILURE_LIMIT) {
         outcome = TASK_STATUS.REQUIRES_HUMAN_REVIEW;
+        try {
+          hooks.onNotify?.({
+            kind: "requires-human-review",
+            title: `Review needed: ${task.title}`,
+            body: "Repeated verification failures.",
+            priority: "high",
+          });
+        } catch {
+          // best-effort
+        }
+      }
     }
 
     const verificationReceipt = record(
@@ -863,6 +961,17 @@ export function createSentinel({
     );
     if (task.agentId) {
       q.touchAgent.run(now(), task.agentId);
+      try {
+        hooks.onVerified?.({
+          agentId: task.agentId,
+          agentName: agent?.name ?? null,
+          taskId,
+          taskTitle: task.title,
+          outcome,
+        });
+      } catch {
+        // Memory is a convenience; a failure there must never change a verdict.
+      }
       if (outcome === TASK_STATUS.VERIFIED_COMPLETE)
         q.setAgentStatus.run("registered", null, task.agentId);
     }
@@ -872,6 +981,226 @@ export function createSentinel({
         receiptId: verificationReceipt.id,
         checks: results,
         outcome,
+      },
+    };
+  }
+
+  /**
+   * Record where the repository stood before an agent starts. Before any
+   * significant change: the commit, and how many files were already dirty —
+   * so "offer rollback" later has a fixed point to roll back to. Evidence,
+   * not a stash: nothing is modified.
+   */
+  async function recordRestorePoint(taskId) {
+    const task = hydrateTask(q.getTask.get(taskId));
+    if (!task) throw new Error("Unknown task.");
+    if (!task.root) return null;
+    let cwd;
+    try {
+      cwd = await approvedRoot(task.root);
+    } catch {
+      return null;
+    }
+    const head = await execFileAsync("git", ["rev-parse", "HEAD"], {
+      cwd,
+      timeout: 10_000,
+    })
+      .then((r) => r.stdout.trim())
+      .catch(() => null);
+    if (!head) return null; // not a git repository: nothing to anchor to
+    const dirty = await execFileAsync("git", ["status", "--porcelain=v1"], {
+      cwd,
+      timeout: 10_000,
+      maxBuffer: 4 * 1024 * 1024,
+    })
+      .then((r) => r.stdout.split("\n").filter(Boolean).length)
+      .catch(() => null);
+    const rp = record(
+      receipt("sentinel-restore-point", task.title, {
+        taskId,
+        root: cwd,
+        head,
+        changedFilesBefore: dirty,
+        honesty: HONESTY.VERIFIED,
+      }),
+    );
+    q.putRestore.run(taskId, head, dirty, rp.id, now());
+    return { head, changedFiles: dirty, receiptId: rp.id };
+  }
+
+  // ---------- Proof record: what the agent actually did ----------
+
+  const STEP_KINDS = new Set(["action", "command", "file", "note", "error"]);
+  const DANGEROUS =
+    /\b(rm\s+-rf|mkfs|dd\s+if=|chmod\s+-R\s+777|curl[^\n]*\|\s*sh)\b/i;
+
+  /**
+   * An agent reports what it is doing as it goes: actions taken, commands it
+   * ran, files it touched, errors it hit. This is AGENT-provenance data — it
+   * fills the proof record and is inspected for injection, but it never
+   * changes a task's status. Only verification does that.
+   */
+  function reportStep(taskId, input = {}) {
+    const task = hydrateTask(q.getTask.get(taskId));
+    if (!task) throw new Error("Unknown task.");
+    if (task.cancelled) throw new Error("This task was cancelled.");
+    const kind = STEP_KINDS.has(input.kind) ? input.kind : "note";
+    const detail = String(input.detail ?? "").slice(0, 2000);
+    if (!detail) throw new Error("A step needs a detail.");
+    const agentId = input.agentId ?? task.agentId ?? null;
+    q.putStep.run(id("STP"), taskId, agentId, kind, detail, now());
+    if (agentId) q.touchAgent.run(now(), agentId);
+    flagInjection(detail, {
+      taskId,
+      agentId,
+      where: `step:${kind}`,
+      title: task.title,
+    });
+    // A dangerous command is a warning even though nothing ran here: Sentinel
+    // never executes it, but the owner should see the intent.
+    if (kind === "command" && DANGEROUS.test(detail)) {
+      record(
+        receipt(
+          "sentinel-dangerous-command",
+          task.title,
+          { taskId, agentId, detail, honesty: HONESTY.KNOWN },
+          { verified: true },
+        ),
+      );
+      injectionEvents.unshift({
+        taskId,
+        agentId,
+        where: "dangerous-command",
+        reasons: ["dangerous command reported"],
+        title: task.title,
+      });
+    }
+    record(
+      receipt(
+        "sentinel-step",
+        task.title,
+        { taskId, agentId, kind, detail },
+        { verified: false },
+      ),
+    );
+    return { taskId, kind, detail };
+  }
+
+  function reportProgress(taskId, input = {}) {
+    const task = hydrateTask(q.getTask.get(taskId));
+    if (!task) throw new Error("Unknown task.");
+    const progress = Math.max(
+      0,
+      Math.min(100, Math.round(Number(input.progress) || 0)),
+    );
+    q.putMeta.run(taskId, progress, task.priority, task.cancelled ? 1 : 0);
+    if (task.agentId) q.touchAgent.run(now(), task.agentId);
+    record(
+      receipt(
+        "sentinel-progress",
+        task.title,
+        {
+          taskId,
+          agentId: task.agentId,
+          progress,
+          note: String(input.note ?? "").slice(0, 500) || null,
+          honesty: HONESTY.UNCERTAIN,
+          meaning: "agent-reported progress, not verified",
+        },
+        { verified: false },
+      ),
+    );
+    return { taskId, progress };
+  }
+
+  function stepsFor(taskId) {
+    return q.listSteps.all(taskId).map((r) => ({
+      id: r.id,
+      agentId: r.agent_id,
+      kind: r.kind,
+      detail: r.detail,
+      at: new Date(r.at).toISOString(),
+    }));
+  }
+
+  /** Owner controls: priority and cancellation. */
+  function setPriority(taskId, priority) {
+    const task = hydrateTask(q.getTask.get(taskId));
+    if (!task) throw new Error("Unknown task.");
+    if (!["low", "normal", "high", "urgent"].includes(priority))
+      throw new Error("Priority must be low, normal, high, or urgent.");
+    q.putMeta.run(taskId, task.progress, priority, task.cancelled ? 1 : 0);
+    record(receipt("sentinel-task-priority", task.title, { taskId, priority }));
+    return hydrateTask(q.getTask.get(taskId));
+  }
+
+  function cancelTask(taskId, reason = "owner-request") {
+    const task = hydrateTask(q.getTask.get(taskId));
+    if (!task) throw new Error("Unknown task.");
+    q.putMeta.run(taskId, task.progress, task.priority, 1);
+    q.setTask.run(
+      TASK_STATUS.CANCELLED,
+      task.claim ? JSON.stringify(task.claim) : null,
+      now(),
+      taskId,
+    );
+    if (task.agentId) q.setAgentStatus.run("registered", null, task.agentId);
+    record(receipt("sentinel-task-cancelled", task.title, { taskId, reason }));
+    return hydrateTask(q.getTask.get(taskId));
+  }
+
+  /** A full proof record for one task: every field the mandate lists. */
+  function proofRecord(taskId) {
+    const task = hydrateTask(q.getTask.get(taskId));
+    if (!task) throw new Error("Unknown task.");
+    const agent = task.agentId
+      ? hydrateAgent(q.getAgent.get(task.agentId))
+      : null;
+    const steps = stepsFor(taskId);
+    const verifications = q.listVerifications.all(taskId).map((r) => ({
+      id: r.id,
+      outcome: r.outcome,
+      checks: parse(r.checks, []),
+      receiptId: r.receipt_id,
+      at: new Date(r.created_at).toISOString(),
+    }));
+    return {
+      taskId,
+      originalInstruction: task.instruction,
+      acceptanceCriteria: task.acceptance,
+      agentResponsible: agent
+        ? { id: agent.id, name: agent.name, provider: agent.provider }
+        : null,
+      actionsTaken: steps.filter(
+        (x) => x.kind === "action" || x.kind === "note",
+      ),
+      commandsExecuted: steps.filter((x) => x.kind === "command"),
+      filesModified: steps.filter((x) => x.kind === "file"),
+      errors: steps.filter((x) => x.kind === "error"),
+      claim: task.claim,
+      progress: task.progress,
+      restorePoint: task.restorePoint,
+      testResults: verifications.flatMap((v) =>
+        v.checks.filter((c) => c.check === "npm-test"),
+      ),
+      verifications,
+      securityFindings: injectionEvents.filter((e) => e.taskId === taskId),
+      finalStatus: task.status,
+      honesty: {
+        agentReported: [
+          "actionsTaken",
+          "commandsExecuted",
+          "filesModified",
+          "errors",
+          "claim",
+          "progress",
+        ],
+        sentinelVerified: [
+          "verifications",
+          "testResults",
+          "restorePoint",
+          "finalStatus",
+        ],
       },
     };
   }
@@ -907,6 +1236,16 @@ export function createSentinel({
       where: "approval-request",
       title: action,
     });
+    try {
+      hooks.onNotify?.({
+        kind: "approval-required",
+        title: `Approval required: ${action}`,
+        body: reason,
+        priority: "high",
+      });
+    } catch {
+      // best-effort
+    }
     record(
       receipt("sentinel-approval-requested", action, {
         approvalId,
@@ -972,6 +1311,16 @@ export function createSentinel({
     );
     injectionEvents.unshift({ ...context, reasons: scan.reasons });
     injectionEvents.length = Math.min(injectionEvents.length, 50);
+    try {
+      hooks.onNotify?.({
+        kind: "security-warning",
+        title: "Suspected prompt injection",
+        body: `${context.title}: ${scan.reasons.join(", ")}`,
+        priority: "urgent",
+      });
+    } catch {
+      // best-effort
+    }
     return true;
   }
 
@@ -1014,6 +1363,7 @@ export function createSentinel({
           count(TASK_STATUS.FAILED) + count(TASK_STATUS.PARTIALLY_COMPLETE),
         blocked: count(TASK_STATUS.BLOCKED) + count(TASK_STATUS.UNVERIFIED),
         needsHuman: count(TASK_STATUS.REQUIRES_HUMAN_REVIEW),
+        cancelled: count(TASK_STATUS.CANCELLED),
         list: tasks,
       },
       approvals: {
@@ -1060,6 +1410,13 @@ export function createSentinel({
     createTask,
     claimComplete,
     verifyTask,
+    recordRestorePoint,
+    reportStep,
+    reportProgress,
+    stepsFor,
+    setPriority,
+    cancelTask,
+    proofRecord,
     listTasks: () => q.listTasks.all().map(hydrateTask),
     verificationsFor: (taskId) =>
       q.listVerifications.all(taskId).map((r) => ({
