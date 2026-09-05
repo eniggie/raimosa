@@ -37,4 +37,35 @@ export const desktopApi = {
   endRemote: (token) => request("/remote/end", { token }),
   runRemote: (tool, remoteToken, payload = {}) =>
     request(`/remote/tools/${tool}`, { ...payload, remoteToken }),
+  // Sentinel
+  sentinelStatus: () => request("/sentinel/status", {}),
+  sentinelPolicy: () => request("/sentinel/policy", {}),
+  sentinelSetLevel: (tool, level) =>
+    request("/sentinel/policy/set", { tool, level }),
+  sentinelRegisterAgent: (agent) => request("/sentinel/agents/register", agent),
+  sentinelPauseAgent: (agentId, reason) =>
+    request("/sentinel/agents/pause", { agentId, reason }),
+  sentinelResumeAgent: (agentId) =>
+    request("/sentinel/agents/resume", { agentId }),
+  sentinelRevokeAgent: (agentId) =>
+    request("/sentinel/agents/revoke", { agentId }),
+  sentinelCreateTask: (task) => request("/sentinel/tasks/create", task),
+  sentinelClaim: (taskId, claim) =>
+    request("/sentinel/tasks/claim", { taskId, ...claim }),
+  sentinelVerify: (taskId, checks, root) =>
+    request("/sentinel/tasks/verify", { taskId, checks, root }),
+  sentinelVerifications: (taskId) =>
+    request("/sentinel/tasks/verifications", { taskId }),
+  sentinelRequestApproval: (approval) =>
+    request("/sentinel/approvals/request", approval),
+  sentinelDecide: (approvalId, decision, accessToken) =>
+    request("/sentinel/approvals/decide", {
+      approvalId,
+      decision,
+      accessToken,
+    }),
+  remoteSentinelStatus: (remoteToken) =>
+    request("/remote/sentinel/status", { remoteToken }),
+  remoteSentinelDecide: (remoteToken, approvalId, decision) =>
+    request("/remote/sentinel/decide", { remoteToken, approvalId, decision }),
 };

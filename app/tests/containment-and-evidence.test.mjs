@@ -20,11 +20,24 @@ async function sandbox(name) {
   await fs.mkdir(home, { recursive: true });
   await fs.mkdir(root, { recursive: true });
   await fs.mkdir(outside, { recursive: true });
-  return { base, home, root, outside };
+  return {
+    base,
+    home,
+    root,
+    outside,
+    ledgerFile: path.join(home, "ledger.db"),
+    stateFile: path.join(home, "state.db"),
+  };
 }
 
+// Every sandbox gets its own ledger and state files. Without this the tests
+// share the checkout's durable state — and one test's emergency latch would
+// silently block every test after it.
 const open = (paths) =>
-  createDesktopToolService({ home: paths.home, workspace: paths.root });
+  createDesktopToolService({
+    ledgerFile: paths.ledgerFile,
+    stateFile: paths.stateFile,
+  });
 
 // A symlink planted inside an approved folder must never let RAIMOSA act on,
 // or report, anything outside the folder the owner actually approved.
@@ -128,8 +141,7 @@ test("an approved plan is rejected if its operations no longer match its hash", 
   const paths = await sandbox("planhash");
   const stateFile = path.join(paths.base, "state.db");
   const service = createDesktopToolService({
-    home: paths.home,
-    workspace: paths.root,
+    ledgerFile: paths.ledgerFile,
     stateFile,
   });
   service.activateLicense({ key: proKey() });

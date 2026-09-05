@@ -8,6 +8,8 @@ import dns from "node:dns/promises";
 import { capabilityCatalog, oviaDoctrine, planCommand } from "./ovia-core.mjs";
 import { createLedger } from "./ledger.mjs";
 import { createStateStore } from "./state-store.mjs";
+import { createSentinel } from "./sentinel.mjs";
+import { providerSummary } from "./providers.mjs";
 import {
   verifyLicenseKey,
   requiresPro,
@@ -1409,6 +1411,17 @@ export function createDesktopToolService(options = {}) {
   // latched, every adapter dispatch, All Access grant, and pairing action is
   // refused at the server, and the latch survives a runtime restart until the
   // owner explicitly clears it.
+  // Sentinel shares the durable state file and writes every decision to the
+  // same ledger as every other action. It is given only what it needs: the
+  // latch, the symlink-safe root resolver, and the live-access lookup.
+  const sentinel = createSentinel({
+    stateFile: state.file,
+    record,
+    receipt,
+    isLatched: () => Boolean(state.getFlag("emergency-stop")),
+    approvedRoot,
+  });
+
   function emergencyStatus() {
     const latch = state.getFlag("emergency-stop");
     return {
@@ -1432,6 +1445,8 @@ export function createDesktopToolService(options = {}) {
     state.deleteAll("remote");
     state.deleteAll("pairing");
     state.setFlag("emergency-stop", { reason: "owner-request" });
+    // STOP ALL AGENTS: every registered agent is paused under the same latch.
+    const pausedAgents = sentinel.pauseAll("emergency-stop");
     record(
       receipt("emergency-stop", "local desktop authority", {
         state: "latched",
@@ -1450,6 +1465,7 @@ export function createDesktopToolService(options = {}) {
       revoked: {
         accessSessions: accessSessions.length,
         remoteSessions: remoteCount,
+        agents: pausedAgents.length,
       },
     };
   }
@@ -2015,10 +2031,16 @@ export function createDesktopToolService(options = {}) {
     requireNotLatched();
     requirePro(tool);
     const effectivePayload = { ...payload };
+    // Authority is resolved here, where the access session lives — by raw
+    // token on the desktop, by hash for a paired phone — and Sentinel's owner
+    // policy is enforced with that fact, in this one dispatch path.
+    let hasAccess = false;
     if (context.remoteToken) {
       const remote = activeRemote(context.remoteToken);
       if (!remote)
         throw new Error("The mobile remote session is expired or revoked.");
+      hasAccess = Boolean(liveAccessByHash(remote.accessTokenHash));
+      sentinel.requireLevel(tool, effectivePayload, { hasAccess });
       if (!REMOTE_TOOLS.has(tool))
         throw new Error("This tool is not available from the mobile remote.");
       // The remote record holds only a hash of the desktop access token, so
@@ -2028,8 +2050,10 @@ export function createDesktopToolService(options = {}) {
         throw new Error(
           "A live OVIA AI All Access session is required for this control.",
         );
-    } else if (CONTROL_TOOLS.has(tool)) {
-      requireAccess(effectivePayload.accessToken);
+    } else {
+      hasAccess = Boolean(activeAccess(effectivePayload.accessToken));
+      sentinel.requireLevel(tool, effectivePayload, { hasAccess });
+      if (CONTROL_TOOLS.has(tool)) requireAccess(effectivePayload.accessToken);
     }
 
     // The capability registry is the authority, not just a source of UI state.
@@ -2129,7 +2153,8 @@ export function createDesktopToolService(options = {}) {
         hostname: os.hostname(),
         defaultWorkspace: workspaceRoot,
         capabilities: capabilityCatalog,
-        doctrine: oviaDoctrine(),
+        doctrine: { ...oviaDoctrine(), ...providerSummary() },
+        sentinel: { protected: !state.getFlag("emergency-stop") },
         emergency: emergencyStatus(),
         native: process.env.RAIMOSA_NATIVE ?? null,
         license: licenseStatus(),
@@ -2251,7 +2276,45 @@ export function createDesktopToolService(options = {}) {
       };
     },
     recovery,
+    sentinel,
+    decideApproval(approvalId, { decision, accessToken } = {}) {
+      return sentinel.decideApproval(approvalId, {
+        decision,
+        via: "desktop",
+        authority: Boolean(activeAccess(accessToken)),
+      });
+    },
+    remoteDecideApproval(remoteToken, approvalId, decision) {
+      const remote = activeRemote(remoteToken);
+      if (!remote)
+        throw new Error(
+          "A live paired remote is required to decide approvals.",
+        );
+      return sentinel.decideApproval(approvalId, {
+        decision,
+        via: "mobile-remote",
+        authority: Boolean(liveAccessByHash(remote.accessTokenHash)),
+      });
+    },
+    remoteSentinelStatus(remoteToken) {
+      if (!activeRemote(remoteToken))
+        throw new Error("A live paired remote is required.");
+      return this.sentinelStatus();
+    },
+    async sentinelStatus() {
+      // Discovery is read-only and platform-gated; if it is unavailable here
+      // the dashboard says so instead of guessing.
+      let discovered = [];
+      try {
+        const scan = await monitorAgentRuntimes();
+        discovered = scan.result?.agents ?? [];
+      } catch {
+        discovered = [];
+      }
+      return { ok: true, ...sentinel.status({ discovered }), discovered };
+    },
     closeLedger() {
+      sentinel.close();
       ledger.close();
       state.close();
     },

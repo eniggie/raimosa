@@ -132,6 +132,99 @@ export function createApiHandler({ getPort, service: injected } = {}) {
         send(res, 200, service.exportLedger(payload));
         return;
       }
+      // ---- Sentinel ----
+      if (route === "/sentinel/status") {
+        send(res, 200, await service.sentinelStatus());
+        return;
+      }
+      if (route === "/sentinel/policy") {
+        send(res, 200, { ok: true, ...service.sentinel.policy() });
+        return;
+      }
+      if (route === "/sentinel/policy/set") {
+        send(res, 200, {
+          ok: true,
+          ...service.sentinel.setLevel(payload.tool, payload.level),
+        });
+        return;
+      }
+      if (route === "/sentinel/agents/register") {
+        send(res, 200, {
+          ok: true,
+          agent: service.sentinel.registerAgent(payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/agents/pause") {
+        send(res, 200, {
+          ok: true,
+          agent: service.sentinel.pauseAgent(payload.agentId, payload.reason),
+        });
+        return;
+      }
+      if (route === "/sentinel/agents/resume") {
+        send(res, 200, {
+          ok: true,
+          agent: service.sentinel.resumeAgent(payload.agentId),
+        });
+        return;
+      }
+      if (route === "/sentinel/agents/revoke") {
+        send(res, 200, {
+          ok: true,
+          agent: service.sentinel.revokeAgent(payload.agentId),
+        });
+        return;
+      }
+      if (route === "/sentinel/agents/usage") {
+        send(res, 200, {
+          ok: true,
+          ...service.sentinel.recordUsage(payload.agentId, payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/create") {
+        send(res, 200, {
+          ok: true,
+          task: service.sentinel.createTask(payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/claim") {
+        send(res, 200, {
+          ok: true,
+          task: service.sentinel.claimComplete(payload.taskId, payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/verify") {
+        send(res, 200, {
+          ok: true,
+          task: await service.sentinel.verifyTask(payload.taskId, payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/tasks/verifications") {
+        send(res, 200, {
+          ok: true,
+          verifications: service.sentinel.verificationsFor(payload.taskId),
+        });
+        return;
+      }
+      if (route === "/sentinel/approvals/request") {
+        send(res, 200, {
+          ok: true,
+          approval: service.sentinel.requestApproval(payload),
+        });
+        return;
+      }
+      if (route === "/sentinel/approvals/decide") {
+        send(res, 200, {
+          ok: true,
+          approval: service.decideApproval(payload.approvalId, payload),
+        });
+        return;
+      }
       if (route === "/license/status") {
         send(res, 200, service.licenseStatus());
         return;
@@ -186,6 +279,21 @@ export function createApiHandler({ getPort, service: injected } = {}) {
       }
       if (route === "/remote/end") {
         send(res, 200, service.endRemote(payload));
+        return;
+      }
+      if (route === "/remote/sentinel/status") {
+        send(res, 200, await service.remoteSentinelStatus(payload.remoteToken));
+        return;
+      }
+      if (route === "/remote/sentinel/decide") {
+        send(res, 200, {
+          ok: true,
+          approval: service.remoteDecideApproval(
+            payload.remoteToken,
+            payload.approvalId,
+            payload.decision,
+          ),
+        });
         return;
       }
       if (route.startsWith("/remote/tools/")) {

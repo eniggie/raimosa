@@ -45,9 +45,11 @@ import { desktopApi } from "./desktop-api";
 import { IntelligenceView } from "./views/IntelligenceView.jsx";
 import { RemoteView } from "./views/RemoteView.jsx";
 import { ToolsView } from "./views/ToolsView.jsx";
+import { SentinelView } from "./views/SentinelView.jsx";
 
 const nav = [
   ["Home", House],
+  ["Sentinel", ShieldCheck],
   ["Intelligence", Sparkle],
   ["Tools", Wrench],
   ["Remote", DeviceMobile],
@@ -1414,6 +1416,14 @@ export function App() {
     workspace = (
       <IntelligenceView
         initialCommand={command}
+        onAnnouncement={setAnnouncement}
+      />
+    );
+  if (active === "Sentinel")
+    workspace = (
+      <SentinelView
+        accessToken={access.token}
+        onRequestAccess={() => setAccessModal(true)}
         onAnnouncement={setAnnouncement}
       />
     );

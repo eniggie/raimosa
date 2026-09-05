@@ -202,6 +202,7 @@ export function RemoteControlView() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [clock, setClock] = useState(Date.now());
+  const [sentinel, setSentinel] = useState(null);
 
   const remaining = useMemo(
     () =>
@@ -213,6 +214,25 @@ export function RemoteControlView() {
         : 0,
     [session, clock],
   );
+
+  // Sentinel from the phone: read-only status plus approve/deny. A Level 3
+  // approval still needs the desktop's live All Access underneath — the phone
+  // never inherits authority.
+  useEffect(() => {
+    if (!session?.token) return;
+    let current = true;
+    const load = () =>
+      desktopApi
+        .remoteSentinelStatus(session.token)
+        .then((data) => current && setSentinel(data))
+        .catch(() => current && setSentinel(null));
+    void load();
+    const id = window.setInterval(load, 5000);
+    return () => {
+      current = false;
+      window.clearInterval(id);
+    };
+  }, [session?.token]);
 
   useEffect(() => {
     if (!session?.token) return;
@@ -334,6 +354,73 @@ export function RemoteControlView() {
             <button type="button" onClick={disconnect}>
               Disconnect
             </button>
+          </section>
+          <section className="remote-card sentinel-remote">
+            <span>SENTINEL</span>
+            {sentinel ? (
+              <>
+                <h2>
+                  {sentinel.latched ? "STOPPED" : "PROTECTED"} ·{" "}
+                  {sentinel.agents.working} working · {sentinel.tasks.verified}{" "}
+                  verified · {sentinel.approvals.pending} approval
+                  {sentinel.approvals.pending === 1 ? "" : "s"}
+                </h2>
+                {sentinel.tasks.claimed > 0 && (
+                  <p>
+                    {sentinel.tasks.claimed} task
+                    {sentinel.tasks.claimed === 1 ? "" : "s"} claimed complete
+                    by an agent but not yet verified by Sentinel.
+                  </p>
+                )}
+                {sentinel.approvals.list
+                  .filter((a) => a.status === "pending")
+                  .map((a) => (
+                    <div className="remote-approval" key={a.id}>
+                      <strong>{a.action}</strong>
+                      <small>
+                        {a.reason} · Level {a.level} · risk {a.risk}
+                      </small>
+                      <div>
+                        <button
+                          type="button"
+                          disabled={Boolean(busy)}
+                          onClick={() =>
+                            desktopApi
+                              .remoteSentinelDecide(
+                                session.token,
+                                a.id,
+                                "approved",
+                              )
+                              .then(() => setError(""))
+                              .catch((e) => setError(e.message))
+                          }
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost"
+                          disabled={Boolean(busy)}
+                          onClick={() =>
+                            desktopApi
+                              .remoteSentinelDecide(
+                                session.token,
+                                a.id,
+                                "denied",
+                              )
+                              .then(() => setError(""))
+                              .catch((e) => setError(e.message))
+                          }
+                        >
+                          Deny
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </>
+            ) : (
+              <p>Sentinel status is unavailable from this remote right now.</p>
+            )}
           </section>
           {error && (
             <div className="remote-error" role="alert">

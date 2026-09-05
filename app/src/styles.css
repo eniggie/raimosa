@@ -3857,3 +3857,158 @@ summary:focus-visible {
 .license-buy:hover {
   text-decoration: underline;
 }
+
+/* ---------- Sentinel ---------- */
+.sentinel-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font:
+    600 10.5px/1.6 Montserrat,
+    sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--muted, #a49dae);
+  background: rgba(255, 255, 255, 0.05);
+}
+.sentinel-chip.ok {
+  color: #8fe3b4;
+  border-color: rgba(143, 227, 180, 0.4);
+  background: rgba(143, 227, 180, 0.1);
+}
+.sentinel-chip.warn {
+  color: #f6d782;
+  border-color: rgba(246, 215, 130, 0.4);
+  background: rgba(246, 215, 130, 0.1);
+}
+.sentinel-chip.bad {
+  color: #ff9d9d;
+  border-color: rgba(255, 157, 157, 0.4);
+  background: rgba(255, 157, 157, 0.1);
+}
+.sentinel-chip.claim {
+  color: #c7b6ff;
+  border-color: rgba(199, 182, 255, 0.4);
+  background: rgba(199, 182, 255, 0.1);
+}
+.sentinel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sentinel-row:first-of-type {
+  border-top: 0;
+}
+.sentinel-row > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.sentinel-row > div:first-child > span {
+  font-size: 13px;
+  color: var(--muted, #a49dae);
+  overflow-wrap: anywhere;
+}
+.sentinel-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sentinel-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sentinel-task {
+  padding-bottom: 8px;
+}
+.sentinel-subrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 8px;
+}
+.sentinel-subrow input {
+  flex: 1 1 260px;
+}
+.sentinel-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12.5px;
+  color: var(--muted, #a49dae);
+}
+.sentinel-checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sentinel-evidence {
+  margin: 4px 0 10px;
+  padding-left: 4px;
+  border-left: 2px solid rgba(255, 255, 255, 0.12);
+}
+.sentinel-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+  align-items: stretch;
+}
+.sentinel-form textarea,
+.sentinel-form select,
+.sentinel-form input {
+  min-width: 0;
+}
+.sentinel-policy {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 8px 18px;
+}
+.sentinel-policy label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.sentinel-note {
+  color: var(--muted, #a49dae);
+  font-size: 13.5px;
+  margin: 10px 0 0;
+}
+.sentinel-error {
+  color: #ff9d9d;
+  margin: 0 0 12px;
+}
+
+.sentinel-remote h2 {
+  font-size: 15px;
+  margin: 6px 0 4px;
+}
+.sentinel-remote p {
+  font-size: 13px;
+  color: var(--muted, #a49dae);
+  margin: 0 0 8px;
+}
+.remote-approval {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.remote-approval small {
+  color: var(--muted, #a49dae);
+}
+.remote-approval > div {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}

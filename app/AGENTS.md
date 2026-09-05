@@ -64,3 +64,16 @@ When implementing from a selected generated mock, treat that image as the source
 - **A lockout that resets on the owner's next attempt is a DoS.** Pairing failures now impose a cooldown and are NOT cleared by generating a fresh code, so a guesser on the LAN cannot lock the owner out forever by burning the limit repeatedly.
 - **Release artifacts are version-stamped, so the landing page can silently 404.** `tools/sync-web-version.mjs` rewrites the download links from `app/package.json`, and `tests/release-consistency.test.mjs` fails if the page, the MSIX manifest, or the winget manifest drift from the shipped version.
 
+## Sentinel (agent supervisor) — durable rules
+
+- **A claim is never a result.** `claimComplete()` moves a task to `CLAIMED` and records a receipt with `verified:false` and honesty `UNCERTAIN`. Only `verifyTask()` — which runs Sentinel's own checks — can produce `VERIFIED_COMPLETE`, and its receipt is `verified:true` only when checks actually ran. Never add a path that trusts an agent's statement.
+- **The Proof Engine runs a fixed allowlist, never a supplied command.** `VERIFIERS` in `server/sentinel.mjs` are literal argv arrays; nothing from a task, claim, agent, or request is spliced into a command. Checks run inside a root resolved by the same symlink-safe `approvedRoot` as every adapter. An unknown check is reported with honesty `UNKNOWN`, not run.
+- **Every Sentinel decision is a ledger receipt** (`sentinel-*` tools) — registration, claims, verifications, approvals, policy changes, budget pauses, stop-all. "Why did Sentinel approve this?" must be answerable from the chain.
+- **Permission Levels 0–3 are enforced in `handle()`**, after the Pro gate, with authority resolved where the access session lives (raw token on desktop, hash for a paired phone). Raising a tool's level is owner policy; lowering below the adapter's default is refused because it would remove a gate the adapter relies on.
+- **A phone inherits no authority.** Remote approvals resolve the desktop's live All Access by hash; a Level 3 approval without it is refused. Denying never needs authority.
+- **STOP ALL AGENTS is the emergency latch.** `emergencyStop()` pauses every registered agent and reports the count in `revoked.agents`; verification under the latch yields `BLOCKED`.
+- **Trust is historical, not truth.** `trustScore()` derives only from verification receipts and carries honesty `INFERRED` and the words "not a guarantee". Never present it as a prediction.
+- **Providers are adapters, never inline vendors.** `server/providers.mjs` ships with no provider configured and `route()` returns `null` with a reason. Nothing may claim model output while `configured` is false.
+- **Tests must isolate durable state.** Always construct the service with per-sandbox `ledgerFile`/`stateFile`; sharing the checkout's state let one test's emergency latch block every test after it.
+- Product name in new surfaces is **RAIMOSA**; the existing "RAIMOSA AI" display name in shipped stores is an owner decision, not something to mass-rename silently.
+
