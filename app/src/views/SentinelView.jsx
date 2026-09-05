@@ -70,15 +70,18 @@ export function SentinelView({ accessToken, onRequestAccess, onAnnouncement }) {
   const [claims, setClaims] = useState({});
   const [checks, setChecks] = useState({});
   const [details, setDetails] = useState({});
+  const [providers, setProviders] = useState(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [s, p] = await Promise.all([
+      const [s, p, h] = await Promise.all([
         desktopApi.sentinelStatus(),
         desktopApi.sentinelPolicy(),
+        desktopApi.health(),
       ]);
       setStatus(s);
       setPolicy(p);
+      setProviders(h.doctrine);
       setError("");
     } catch (refreshError) {
       setError(refreshError.message);
@@ -706,8 +709,17 @@ export function SentinelView({ accessToken, onRequestAccess, onAnnouncement }) {
           description="RAIMOSA works locally with no model. Sentinel never claims model output unless a provider is genuinely configured."
         >
           <p className="sentinel-note">
-            Configured provider: <strong>none</strong>. Add an adapter to enable
-            model-backed features; nothing here will pretend one exists.
+            Configured provider:{" "}
+            <strong>{providers?.modelProvider ?? "none"}</strong>.{" "}
+            {providers?.available?.length
+              ? providers.available
+                  .map(
+                    (p) =>
+                      `${p.name} (${p.configured ? "configured" : `not configured — add ${p.id === "openai" ? "OPENAI_API_KEY" : "a key"} in the Vault`})`,
+                  )
+                  .join(" · ")
+              : "No adapters registered."}{" "}
+            Nothing here will pretend a model exists.
           </p>
         </Section>
       )}

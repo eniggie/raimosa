@@ -37,6 +37,12 @@ export const desktopApi = {
   endRemote: (token) => request("/remote/end", { token }),
   runRemote: (tool, remoteToken, payload = {}) =>
     request(`/remote/tools/${tool}`, { ...payload, remoteToken }),
+  // Credential vault — values are never returned by any route.
+  vaultStatus: () => request("/vault/status", {}),
+  vaultPut: (name, secret, purpose, accessToken) =>
+    request("/vault/put", { name, secret, purpose, accessToken }),
+  vaultRemove: (name, accessToken) =>
+    request("/vault/remove", { name, accessToken, confirmation: "CONFIRM" }),
   // Sentinel
   sentinelStatus: () => request("/sentinel/status", {}),
   sentinelPolicy: () => request("/sentinel/policy", {}),

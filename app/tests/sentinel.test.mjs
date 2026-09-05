@@ -363,13 +363,17 @@ test("repeated failures escalate to a human instead of looping", async () => {
 });
 
 test("the provider registry ships unconfigured and never pretends", () => {
-  assert.deepEqual(listProviders(), []);
+  // The OpenAI adapter is registered at boot but reports configured:false
+  // until the vault holds a key — so routing returns nothing, honestly.
+  const listed = listProviders();
+  const openai = listed.find((p) => p.id === "openai");
+  assert.ok(openai, "the adapter is registered");
+  assert.equal(openai.configured, false);
   const r = route({ kind: "text" });
   assert.equal(r.provider, null);
-  assert.match(r.reason, /No AI provider is configured/);
+  assert.match(r.reason, /No configured provider|No AI provider is configured/);
   registerProvider({ id: "stub", kind: "text", configured: () => false });
   assert.equal(route({ kind: "text" }).provider, null);
-  assert.equal(listProviders()[0].configured, false);
 });
 
 test("health reports Sentinel and the honest provider state", async () => {

@@ -9,7 +9,9 @@ import { capabilityCatalog, oviaDoctrine, planCommand } from "./ovia-core.mjs";
 import { createLedger } from "./ledger.mjs";
 import { createStateStore } from "./state-store.mjs";
 import { createSentinel } from "./sentinel.mjs";
-import { providerSummary } from "./providers.mjs";
+import { providerSummary, registerProvider } from "./providers.mjs";
+import { createVault } from "./vault.mjs";
+import { createOpenAIProvider } from "./providers/openai.mjs";
 import {
   verifyLicenseKey,
   requiresPro,
@@ -1422,6 +1424,18 @@ export function createDesktopToolService(options = {}) {
     approvedRoot,
   });
 
+  // The credential vault brokers the OS keychain. RAIMOSA's DB holds names
+  // only; no API route ever returns a value. Tests inject a memory backend.
+  const vault = createVault({
+    stateFile: state.file,
+    record,
+    receipt,
+    backend: options.vaultBackend,
+  });
+  // Provider adapters read their keys from the vault in-process and report
+  // configured:false until one exists. Registering is idempotent.
+  registerProvider(createOpenAIProvider({ vault }));
+
   function emergencyStatus() {
     const latch = state.getFlag("emergency-stop");
     return {
@@ -2277,6 +2291,27 @@ export function createDesktopToolService(options = {}) {
     },
     recovery,
     sentinel,
+    vault,
+    vaultStatus() {
+      return { ok: true, ...vault.status(), secrets: vault.list() };
+    },
+    async vaultPut(payload = {}) {
+      requireNotLatched();
+      requireAccess(payload.accessToken);
+      return {
+        ok: true,
+        secret: await vault.put(payload.name, payload.secret, {
+          purpose: payload.purpose,
+        }),
+      };
+    },
+    async vaultRemove(payload = {}) {
+      requireNotLatched();
+      requireAccess(payload.accessToken);
+      if (payload.confirmation !== "CONFIRM")
+        throw new Error('Type "CONFIRM" to remove a stored credential.');
+      return { ok: true, ...(await vault.remove(payload.name)) };
+    },
     decideApproval(approvalId, { decision, accessToken } = {}) {
       return sentinel.decideApproval(approvalId, {
         decision,
@@ -2314,6 +2349,7 @@ export function createDesktopToolService(options = {}) {
       return { ok: true, ...sentinel.status({ discovered }), discovered };
     },
     closeLedger() {
+      vault.close();
       sentinel.close();
       ledger.close();
       state.close();

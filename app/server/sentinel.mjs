@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { inspect, SOURCE } from "./provenance.mjs";
 
 // RAIMOSA Sentinel — the independent agent supervisor.
 //
@@ -654,6 +655,15 @@ export function createSentinel({
     };
     q.setTask.run(TASK_STATUS.CLAIMED, JSON.stringify(claim), now(), taskId);
     if (claim.agentId) q.touchAgent.run(now(), claim.agentId);
+    // An agent's words are AGENT-provenance data: recorded, never executed.
+    // If they read like an attempt to steer RAIMOSA or pull a secret, the
+    // attempt itself becomes a security receipt and a dashboard warning.
+    flagInjection(claim.summary, {
+      taskId,
+      agentId: claim.agentId,
+      where: "claim",
+      title: task.title,
+    });
     record(
       receipt(
         "sentinel-claim",
@@ -891,6 +901,12 @@ export function createSentinel({
       risk,
       now(),
     );
+    flagInjection(`${action}\n${reason}`, {
+      approvalId,
+      agentId: input.agentId ?? null,
+      where: "approval-request",
+      title: action,
+    });
     record(
       receipt("sentinel-approval-requested", action, {
         approvalId,
@@ -940,6 +956,25 @@ export function createSentinel({
 
   // ---------- Dashboard ----------
 
+  // Recent suspected injections, surfaced as warnings. The receipt is the
+  // durable record; this is only what the dashboard shows right now.
+  const injectionEvents = [];
+  function flagInjection(text, context) {
+    const scan = inspect(text, SOURCE.AGENT);
+    if (!scan.suspicious) return false;
+    record(
+      receipt(
+        "sentinel-injection-suspected",
+        context.title,
+        { ...context, reasons: scan.reasons },
+        { verified: true },
+      ),
+    );
+    injectionEvents.unshift({ ...context, reasons: scan.reasons });
+    injectionEvents.length = Math.min(injectionEvents.length, 50);
+    return true;
+  }
+
   function status({ discovered = [] } = {}) {
     const agents = listAgents({ discovered });
     const tasks = q.listTasks.all().map(hydrateTask);
@@ -959,6 +994,8 @@ export function createSentinel({
           taskId: t.id,
           title: t.title,
         });
+    for (const e of injectionEvents)
+      warnings.push({ kind: "injection-suspected", ...e });
     const latched = isLatched();
     return {
       protected: !latched,

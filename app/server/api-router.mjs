@@ -225,6 +225,19 @@ export function createApiHandler({ getPort, service: injected } = {}) {
         });
         return;
       }
+      // ---- Credential vault (names only ever leave the server) ----
+      if (route === "/vault/status") {
+        send(res, 200, service.vaultStatus());
+        return;
+      }
+      if (route === "/vault/put") {
+        send(res, 200, await service.vaultPut(payload));
+        return;
+      }
+      if (route === "/vault/remove") {
+        send(res, 200, await service.vaultRemove(payload));
+        return;
+      }
       if (route === "/license/status") {
         send(res, 200, service.licenseStatus());
         return;

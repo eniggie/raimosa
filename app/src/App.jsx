@@ -46,6 +46,7 @@ import { IntelligenceView } from "./views/IntelligenceView.jsx";
 import { RemoteView } from "./views/RemoteView.jsx";
 import { ToolsView } from "./views/ToolsView.jsx";
 import { SentinelView } from "./views/SentinelView.jsx";
+import { VaultView } from "./views/VaultView.jsx";
 
 const nav = [
   ["Home", House],
@@ -55,6 +56,7 @@ const nav = [
   ["Remote", DeviceMobile],
   ["Ledger", BookOpen],
   ["Permissions", LockKey],
+  ["Vault", Fingerprint],
   ["Settings", GearSix],
 ];
 
@@ -1422,6 +1424,14 @@ export function App() {
   if (active === "Sentinel")
     workspace = (
       <SentinelView
+        accessToken={access.token}
+        onRequestAccess={() => setAccessModal(true)}
+        onAnnouncement={setAnnouncement}
+      />
+    );
+  if (active === "Vault")
+    workspace = (
+      <VaultView
         accessToken={access.token}
         onRequestAccess={() => setAccessModal(true)}
         onAnnouncement={setAnnouncement}
