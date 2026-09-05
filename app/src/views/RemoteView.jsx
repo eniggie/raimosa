@@ -301,7 +301,7 @@ export function RemoteControlView() {
       <header>
         <img src="/assets/raimosa-r-emblem.png" alt="" />
         <div>
-          <strong>RAIMOSA AI</strong>
+          <strong>RAIMOSA</strong>
           <span>OVIA AI MOBILE REMOTE</span>
         </div>
       </header>
@@ -509,7 +509,7 @@ export function RemoteControlView() {
                 type="button"
                 onClick={() =>
                   run("local-notification", {
-                    title: "RAIMOSA AI Remote",
+                    title: "RAIMOSA Remote",
                     message: notification,
                   })
                 }

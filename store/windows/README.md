@@ -1,4 +1,4 @@
-# RAIMOSA AI — Microsoft Store (MSIX) build & submit
+# RAIMOSA — Microsoft Store (MSIX) build & submit
 
 MSIX packaging needs `MakeAppx.exe` from the Windows SDK, which exists only on
 Windows. Everything that *can* be prepared on macOS already is: the manifest
@@ -63,7 +63,9 @@ Uninstall the test: `Remove-AppxPackage ECONTEURLLC.RAIMOSAAI_...`.
 ## Submit
 
 1. In [Partner Center](https://partner.microsoft.com/dashboard) → your reserved
-   app **RAIMOSA AI** → **Packages** → upload the **unsigned** `.msix`.
+   app (reserved as **“RAIMOSA AI”** — the reservation predates the rename and
+   changing it is a Partner Center action) → **Packages** → upload the
+   **unsigned** `.msix`.
 2. Fill the listing from `store/windows/listing.md`; privacy policy from
    `store/windows/PRIVACY.md` (host it at a public URL, e.g. on the landing
    page).

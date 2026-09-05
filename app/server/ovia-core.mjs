@@ -254,7 +254,7 @@ export const capabilityCatalog = [
     risk: "external-agent-control",
     adapter: null,
     description:
-      "No universal agent-control protocol exists. A named, authenticated Codex, Claude, Grok, Gemini, or other provider adapter must be configured and verified before RAIMOSA AI can dispatch work to it.",
+      "No universal agent-control protocol exists. A named, authenticated Codex, Claude, Grok, Gemini, or other provider adapter must be configured and verified before RAIMOSA can dispatch work to it.",
   },
 ];
 

@@ -9,6 +9,10 @@ Paste each field into Partner Center → your app → **Store listings → Engli
 RAIMOSA AI
 ```
 
+> This one field must match the Partner Center reservation (“RAIMOSA AI”)
+> exactly or the submission is rejected. The product itself is RAIMOSA; the
+> reservation predates the rename and changing it is a Partner Center action.
+
 ## Short description (≤ 100 chars)
 ```
 A local, governed desktop commander. Every action it takes writes a receipt you can verify.
@@ -16,7 +20,7 @@ A local, governed desktop commander. Every action it takes writes a receipt you 
 
 ## Description (≤ 10,000 chars)
 ```
-RAIMOSA AI is a local desktop commander. One assistant — OVIA AI — plans work,
+RAIMOSA is a local desktop commander. One assistant — OVIA AI — plans work,
 asks for your approval, carries it out through named tools, and writes a
 tamper-evident receipt for everything it does. It runs entirely on your
 machine. There is no cloud account, no telemetry, and no external model.

@@ -1235,7 +1235,7 @@ async function monitorAgentRuntimes() {
 }
 
 async function localNotification(payload) {
-  const rawTitle = String(payload.title ?? "RAIMOSA AI").slice(0, 80);
+  const rawTitle = String(payload.title ?? "RAIMOSA").slice(0, 80);
   const rawMessage = String(payload.message ?? "").slice(0, 240);
   if (!rawMessage) throw new Error("Notification text is required.");
 
@@ -1264,7 +1264,7 @@ async function localNotification(payload) {
           "$n=$t.GetElementsByTagName('text');" +
           "$n.Item(0).AppendChild($t.CreateTextNode($args[0])) > $null;" +
           "$n.Item(1).AppendChild($t.CreateTextNode($args[1])) > $null;" +
-          "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('RAIMOSA AI').Show([Windows.UI.Notifications.ToastNotification]::new($t))",
+          "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('RAIMOSA').Show([Windows.UI.Notifications.ToastNotification]::new($t))",
         rawTitle,
         rawMessage,
       ],
@@ -2256,7 +2256,7 @@ export function createDesktopToolService(options = {}) {
         integrity,
         content: JSON.stringify(
           {
-            product: "RAIMOSA AI",
+            product: "RAIMOSA",
             exportedAt: new Date().toISOString(),
             host: os.hostname(),
             platform: process.platform,

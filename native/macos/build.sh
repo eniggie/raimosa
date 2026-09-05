@@ -99,8 +99,8 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>RAIMOSA AI</string>
-  <key>CFBundleDisplayName</key><string>RAIMOSA AI</string>
+  <key>CFBundleName</key><string>RAIMOSA</string>
+  <key>CFBundleDisplayName</key><string>RAIMOSA</string>
   <key>CFBundleIdentifier</key><string>com.econteur.raimosa</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>

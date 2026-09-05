@@ -1,4 +1,4 @@
-# RAIMOSA AI on winget (Windows Package Manager)
+# RAIMOSA on winget (Windows Package Manager)
 
 winget is Microsoft's official package manager, built into Windows 10/11. It
 distributes RAIMOSA **without** the Microsoft Store, MSIX, Partner Center

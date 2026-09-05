@@ -643,7 +643,7 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
             icon={Activity}
             eyebrow="READ-ONLY AGENT DISCOVERY"
             title="Local AI agent runtimes"
-            description="Discover supported local agent CLIs and running processes. RAIMOSA AI does not read their prompts, transcripts, credentials, or private state."
+            description="Discover supported local agent CLIs and running processes. RAIMOSA does not read their prompts, transcripts, credentials, or private state."
           >
             <div className="tool-actions">
               <ActionButton
@@ -929,7 +929,7 @@ export function ToolsView({ accessToken, onRequestAccess, onAnnouncement }) {
                 disabled={!notification.trim()}
                 onClick={() =>
                   run("local-notification", {
-                    title: "RAIMOSA AI",
+                    title: "RAIMOSA",
                     message: notification,
                   })
                 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RAIMOSA AI — Linux desktop integration.
+# RAIMOSA — Linux desktop integration.
 #
 #   ./native/linux/install-desktop.sh
 #
@@ -27,7 +27,7 @@ LAUNCHER="$BIN_DIR/raimosa-desktop"
 say() { printf '  %s\n' "$1"; }
 fail() { printf '\n  ERROR: %s\n\n' "$1" >&2; exit 1; }
 
-printf '\n  RAIMOSA AI — Linux desktop integration\n\n'
+printf '\n  RAIMOSA — Linux desktop integration\n\n'
 
 # Prefer the bundled Node so nothing needs installing; fall back to a system
 # Node only for a CPU architecture we did not bundle.
@@ -103,7 +103,7 @@ cp "$ROOT/app/public/assets/raimosa-app-icon.png" "$ICON_DIR/raimosa.png"
 cat > "$APP_DIR/raimosa.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=RAIMOSA AI
+Name=RAIMOSA
 GenericName=Desktop Commander
 Comment=A local, governed desktop commander with a tamper-evident receipt ledger
 Exec=$LAUNCHER
@@ -118,10 +118,10 @@ command -v update-desktop-database >/dev/null 2>&1 && \
 
 cat <<EOF
 
-  RAIMOSA AI is in your application menu.
+  RAIMOSA is in your application menu.
 
     Start it:  $LAUNCHER
-    Or search for "RAIMOSA AI" in your launcher.
+    Or search for "RAIMOSA" in your launcher.
 
   Note: this opens a dedicated app window via an installed Chromium-family
   browser. It is not a compiled native shell like the macOS build.

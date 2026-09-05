@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RAIMOSA AI installer — macOS and Linux.
+# RAIMOSA installer — macOS and Linux.
 #
 #   curl -fsSL <url>/install.sh | bash
 #   ./install.sh
@@ -15,7 +15,7 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/app"
 say()  { printf '  %s\n' "$1"; }
 fail() { printf '\n  ERROR: %s\n\n' "$1" >&2; exit 1; }
 
-printf '\n  RAIMOSA AI installer\n\n'
+printf '\n  RAIMOSA installer\n\n'
 
 # 1. Node
 if ! command -v node >/dev/null 2>&1; then
@@ -76,7 +76,7 @@ fi
 
 cat <<EOF
 
-  RAIMOSA AI is installed.
+  RAIMOSA is installed.
 
     Start it:   $LAUNCH
     Options:    $LAUNCH --port 5000 --no-open

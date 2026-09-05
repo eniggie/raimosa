@@ -40,7 +40,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.help) {
-    console.log(`RAIMOSA AI — local desktop commander
+    console.log(`RAIMOSA — local desktop commander
 
   raimosa                 Start RAIMOSA and open it in your browser
   raimosa --port 5000     Use a specific port (default 4173)
@@ -84,7 +84,7 @@ requests only; a paired phone is limited to your local network.`);
   }
 
   const { url, port } = await startRaimosa({ port: args.port });
-  console.log(`\n  RAIMOSA AI ${pkg.version}`);
+  console.log(`\n  RAIMOSA ${pkg.version}`);
   console.log(`  Running at ${url}`);
   console.log(`  Platform   ${process.platform} (${process.arch})`);
   console.log(`  Press Ctrl+C to stop.\n`);

@@ -1,11 +1,11 @@
-# RAIMOSA AI — Privacy Policy
+# RAIMOSA — Privacy Policy
 
 **Effective date:** August 7, 2026
 **Publisher:** ECONTEUR LLC
 
 ## The short version
 
-RAIMOSA AI collects nothing, transmits nothing, and has no servers. It runs
+RAIMOSA collects nothing, transmits nothing, and has no servers. It runs
 entirely on your computer.
 
 ## What data RAIMOSA accesses

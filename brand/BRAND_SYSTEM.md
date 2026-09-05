@@ -1,10 +1,10 @@
-# RAIMOSA AI Brand System
+# RAIMOSA Brand System
 
-RAIMOSA AI is an intelligent Desktop Commander. Its identity combines a clearly readable capital **R** with a royal-purple inlay, gold structural edges, and a command ring carrying six real product capabilities.
+RAIMOSA is an intelligent Desktop Commander. Its identity combines a clearly readable capital **R** with a royal-purple inlay, gold structural edges, and a command ring carrying six real product capabilities.
 
 ## Core line
 
-**RAIMOSA AI**  
+**RAIMOSA**  
 **Command Your World With Intelligence**
 
 The tagline is title case in prose and may be uppercase with generous tracking in display lockups.

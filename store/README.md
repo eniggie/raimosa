@@ -50,7 +50,7 @@ in `store/windows/`:
 1. **Register a Microsoft Partner Center developer account** — one-time fee
    (~$19 individual / ~$99 company). https://partner.microsoft.com/dashboard
    *(I can't create accounts or make payments.)*
-2. **Reserve the app name** "RAIMOSA AI" in Partner Center → it gives you the
+2. **Reserve the app name** "RAIMOSA" in Partner Center → it gives you the
    **Package Identity Name**, **Publisher**, and **Publisher CN**.
 3. On a **Windows machine** with the Windows SDK installed:
    - run `native/fetch-node.sh` (Git Bash or WSL) to fetch the bundled Node,

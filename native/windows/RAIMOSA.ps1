@@ -1,4 +1,4 @@
-# RAIMOSA AI — native Windows shell.
+# RAIMOSA — native Windows shell.
 #
 #   powershell -ExecutionPolicy Bypass -File .\native\windows\RAIMOSA.ps1
 #
@@ -16,7 +16,7 @@ $MinNodeMajor = 22
 $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $Entry = Join-Path $Root 'app\bin\raimosa.mjs'
 
-function Fail { param($m) [System.Windows.Forms.MessageBox]::Show($m, 'RAIMOSA AI') | Out-Null; exit 1 }
+function Fail { param($m) [System.Windows.Forms.MessageBox]::Show($m, 'RAIMOSA') | Out-Null; exit 1 }
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -81,7 +81,7 @@ if (-not $ready) {
 
 # --- Window ---
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'RAIMOSA AI'
+$form.Text = 'RAIMOSA'
 $form.Width = 1440
 $form.Height = 940
 $form.MinimumSize = New-Object System.Drawing.Size(1120, 720)

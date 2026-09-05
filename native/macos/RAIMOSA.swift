@@ -1,4 +1,4 @@
-// RAIMOSA AI — native macOS shell.
+// RAIMOSA — native macOS shell.
 //
 // A real AppKit application that owns the RAIMOSA runtime: it launches the
 // local Node server as a child process, waits for it to answer, and renders
@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "RAIMOSA AI"
+        window.title = "RAIMOSA"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.backgroundColor = NSColor(red: 0.027, green: 0.012, blue: 0.051, alpha: 1)
@@ -211,10 +211,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About RAIMOSA AI", action: #selector(showAbout), keyEquivalent: "")
+        appMenu.addItem(withTitle: "About RAIMOSA", action: #selector(showAbout), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide RAIMOSA AI", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit RAIMOSA AI", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Hide RAIMOSA", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Quit RAIMOSA", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
@@ -247,7 +247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     @objc private func showAbout() {
         let alert = NSAlert()
-        alert.messageText = "RAIMOSA AI"
+        alert.messageText = "RAIMOSA"
         alert.informativeText = """
             A local, governed desktop commander.
 

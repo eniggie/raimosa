@@ -1,4 +1,4 @@
-// RAIMOSA AI provider abstraction.
+// RAIMOSA provider abstraction.
 //
 // RAIMOSA must survive any one vendor changing its API or pricing, so no part
 // of the product may import a vendor SDK directly. Providers register here

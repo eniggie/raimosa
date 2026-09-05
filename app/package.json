@@ -1,12 +1,13 @@
 {
   "name": "raimosa",
   "version": "0.1.0",
-  "description": "RAIMOSA AI — a local, governed desktop commander with verified adapters and a tamper-evident receipt ledger.",
+  "description": "RAIMOSA \u2014 a local, governed desktop commander with verified adapters and a tamper-evident receipt ledger.",
   "license": "UNLICENSED",
   "author": "ECONTEUR LLC",
   "type": "module",
   "bin": {
-    "raimosa": "bin/raimosa.mjs"
+    "raimosa": "bin/raimosa.mjs",
+    "raimosa-mcp": "bin/raimosa-mcp.mjs"
   },
   "main": "server/standalone.mjs",
   "exports": {

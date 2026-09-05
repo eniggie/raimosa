@@ -153,7 +153,7 @@ function Header({
       >
         <img src="/assets/raimosa-r-emblem.png" alt="" />
         <div>
-          <strong>RAIMOSA AI</strong>
+          <strong>RAIMOSA</strong>
           <span>AI DESKTOP COMMANDER</span>
         </div>
       </button>
@@ -634,7 +634,7 @@ function RuntimeLedgerView() {
       <PageHeading
         eyebrow="LEDGER"
         title="Runtime receipt ledger"
-        description="Verified adapter, access, scan, and mobile-remote events from this local RAIMOSA AI runtime."
+        description="Verified adapter, access, scan, and mobile-remote events from this local RAIMOSA runtime."
         action={
           <div className="ledger-actions">
             <button
@@ -836,7 +836,7 @@ function Ovia({ access, command, onAccess, onEnd, collapsed, onToggle }) {
       ...(userText ? [{ id: Date.now(), text: userText, time: "You" }] : []),
       {
         id: Date.now() + 1,
-        text: "Running a live read-only scan of the local RAIMOSA AI runtime.",
+        text: "Running a live read-only scan of the local RAIMOSA runtime.",
         time: "OVIA AI",
       },
     ]);

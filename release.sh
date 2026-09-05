@@ -23,7 +23,7 @@ VERSION="$(node -p "require('$ROOT/app/package.json').version")"
 say() { printf '  %s\n' "$1"; }
 fail() { printf '\n  ERROR: %s\n\n' "$1" >&2; exit 1; }
 
-printf '\n  RAIMOSA AI — building release %s\n\n' "$VERSION"
+printf '\n  RAIMOSA — building release %s\n\n' "$VERSION"
 
 # Never ship something the suite rejects.
 say "Verifying…"
@@ -48,7 +48,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
   # The familiar drag-to-install gesture.
   ln -s /Applications "$STAGE/Applications"
   cat > "$OUT/READ-ME-FIRST.txt" <<'NOTE'
-RAIMOSA AI
+RAIMOSA
 
 1. Drag RAIMOSA to the Applications folder beside it.
 2. Double-click to open.
@@ -68,7 +68,7 @@ NOTE
   cp "$OUT/READ-ME-FIRST.txt" "$STAGE/READ ME FIRST.txt"
 
   DMG="$OUT/RAIMOSA-$VERSION-macOS.dmg"
-  hdiutil create -volname "RAIMOSA AI" -srcfolder "$STAGE" \
+  hdiutil create -volname "RAIMOSA" -srcfolder "$STAGE" \
     -ov -format UDZO "$DMG" >/dev/null
   rm -rf "$STAGE"
   say "Built $(basename "$DMG") ($(du -h "$DMG" | cut -f1))"
@@ -120,7 +120,7 @@ else
   say "NOTE: vendor/node missing — Windows build will require Node 22+ installed."
 fi
 cat > "$WIN/START HERE.txt" <<'NOTE'
-RAIMOSA AI for Windows
+RAIMOSA for Windows
 
 To start:
   Right-click START-RAIMOSA.cmd and choose Run.
@@ -159,7 +159,7 @@ cp "$ROOT/native/linux/install-desktop.sh" "$LNX/native/linux/"
 chmod +x "$LNX/native/linux/install-desktop.sh"
 cp "$ROOT/README.md" "$LNX/"
 cat > "$LNX/START HERE.txt" <<'NOTE'
-RAIMOSA AI for Linux
+RAIMOSA for Linux
 
 To add RAIMOSA to your application menu:
   ./native/linux/install-desktop.sh
@@ -189,7 +189,7 @@ if [ -n "${NOTARIZE_PID:-}" ]; then
     cp -R "$APP" "$STAGE2/"; ln -s /Applications "$STAGE2/Applications"
     cp "$OUT/READ-ME-FIRST.txt" "$STAGE2/READ ME FIRST.txt" 2>/dev/null || true
     rm -f "$DMG"
-    hdiutil create -volname "RAIMOSA AI" -srcfolder "$STAGE2" \
+    hdiutil create -volname "RAIMOSA" -srcfolder "$STAGE2" \
       -ov -format UDZO "$DMG" >/dev/null
     rm -rf "$STAGE2"
     xcrun stapler staple "$DMG" >/dev/null 2>&1 || true

@@ -1,4 +1,4 @@
-# RAIMOSA AI
+# RAIMOSA
 
 A local, governed desktop commander. One unified **OVIA AI** plans work, asks for
 approval, executes through named adapters, and writes a tamper-evident receipt for

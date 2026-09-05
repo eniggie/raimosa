@@ -9,18 +9,18 @@ When implementing from a selected generated mock, treat that image as the source
 ## Durable RAIMOSA decisions
 
 - Current visual truth: `../docs/ux/raimosa-command-center-ovia-unified-v2.png`.
-- Product identity is **RAIMOSA AI** with the approved R emblem in `public/assets/raimosa-r-emblem.png`.
+- Product identity is **RAIMOSA** with the approved R emblem in `public/assets/raimosa-r-emblem.png`.
 - There is one unified **OVIA AI**, not separate Commander and Inspector agents.
 - Always use the full user-facing name **OVIA AI**; never shorten the name in product copy.
 - OVIA AI has three visible modes inside one persistent chat: **Ask**, **Operate**, and **Scan & Debug**.
 - The composer always shows the current mode and authority.
 - **All Access** is one visible, time-limited, revocable session; it never removes high-risk step-up approvals.
 - Scan & Debug starts read-only, can propose a repair mission, and verifies the result in the same conversation.
-- RAIMOSA AI is designed to find and organize approved files, launch or close supported apps, open documents, monitor long-running work, create verified work products, and prepare sleep/restart/shutdown actions.
+- RAIMOSA is designed to find and organize approved files, launch or close supported apps, open documents, monitor long-running work, create verified work products, and prepare sleep/restart/shutdown actions.
 - Sign-in assistance may open and guide an approved authentication surface, but credentials remain system- or browser-managed and the user completes authentication.
 - Broad desktop operation means supported, named adapters under visible policy; it never means hidden arbitrary control, silent credential use, or unlogged execution.
 - Do not expose a desktop action, tool card, or CTA until its real adapter exists and the result can be verified end to end. Roadmap capabilities belong in documentation, not as clickable product controls.
-- RAIMOSA AI is desktop-first. Mobile is supported only as a paired local-network remote for the active desktop session, not as a separate mobile product.
+- RAIMOSA is desktop-first. Mobile is supported only as a paired local-network remote for the active desktop session, not as a separate mobile product.
 - Mobile remote pairing requires a fresh desktop-generated code plus an active OVIA AI All Access session. Revoking All Access or using Emergency stop must invalidate paired remote sessions immediately.
 - Read-only adapters may run without All Access. Writes, application control, document opening, and visible notifications require a server-validated All Access token and a verification receipt.
 - Tool and Permission UI must be derived from the live capability registry. Unavailable capabilities may be explained but must never expose action controls.
@@ -46,7 +46,7 @@ When implementing from a selected generated mock, treat that image as the source
 - Every scanning adapter must be bounded *and* say when a bound was hit. `find-duplicates` reports `complete`, `bytesHashed`, and an explicit `limitation` string. Never return a partial result that looks complete.
 - The ambient field is painted on `body::before`, outside the `.shell` subtree that carries `.reduced-motion`. `App.jsx` mirrors the setting onto `<body class="reduced-motion-field">`. Any new animation outside `.shell` must be covered the same way.
 - Pairing codes come from `crypto.randomInt`, and 5 failed pairing attempts revoke every outstanding code (`remote-pairing-lockout` receipt). Never weaken the attempt limit or switch to `Math.random`.
-- RAIMOSA AI must never claim an action, agent dispatch, or repair ran without a verified adapter receipt. Every detected issue and failed check must be surfaced; findings cannot be silently skipped.
+- RAIMOSA must never claim an action, agent dispatch, or repair ran without a verified adapter receipt. Every detected issue and failed check must be surfaced; findings cannot be silently skipped.
 - Local AI agent discovery is read-only process and executable metadata. Commanding Codex, Claude, Grok, Gemini, or another agent requires a named, authenticated, revocable provider adapter and must never inherit credentials or authority.
 - Monetization is offline and cryptographic — never add accounts, telemetry, or a license server. A license key is an Ed25519-signed token verified locally in `server/licensing.mjs` against the embedded public key; the private signing key lives only at `~/.raimosa-keys/` and must never be committed. Never add a Pro bypass/backdoor (no `_proForTests` option, no env override): tests unlock Pro by minting a real key via `tools/sign-license.mjs`.
 - Pro gating is server-enforced in `handle()` (via `PRO_TOOLS`) and at `startRemotePairing` (via `PRO_FEATURES`), not just hidden in the UI — the same principle as every other RAIMOSA gate. Free must stay genuinely useful (the full governed loop + ledger); that free value is what converts to Pro.
@@ -75,5 +75,7 @@ When implementing from a selected generated mock, treat that image as the source
 - **Trust is historical, not truth.** `trustScore()` derives only from verification receipts and carries honesty `INFERRED` and the words "not a guarantee". Never present it as a prediction.
 - **Providers are adapters, never inline vendors.** `server/providers.mjs` ships with no provider configured and `route()` returns `null` with a reason. Nothing may claim model output while `configured` is false.
 - **Tests must isolate durable state.** Always construct the service with per-sandbox `ledgerFile`/`stateFile`; sharing the checkout's state let one test's emergency latch block every test after it.
-- Product name in new surfaces is **RAIMOSA**; the existing "RAIMOSA AI" display name in shipped stores is an owner decision, not something to mass-rename silently.
+- Product name in new surfaces is **RAIMOSA**; the existing "RAIMOSA" display name in shipped stores is an owner decision, not something to mass-rename silently.
+- **Agents connect through the MCP bridge (`bin/raimosa-mcp.mjs`), and the bridge enforces nothing.** Every rule lives in the adapter, so bypassing the bridge changes nothing. The bridge's tool surface deliberately contains no desktop action: agents register, create tasks, claim, request verification, request approval, and report spend. Never add an MCP tool that dispatches a desktop adapter.
+- The product name is **RAIMOSA** everywhere RAIMOSA controls. Only the Microsoft Store reservation and the winget PackageName still read "RAIMOSA AI" because those identities are assigned by the store; `store/windows/listing.md`'s product-name field must keep matching the reservation.
 

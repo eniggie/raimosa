@@ -1,4 +1,4 @@
-# RAIMOSA AI installer — Windows (PowerShell 5.1+).
+# RAIMOSA installer — Windows (PowerShell 5.1+).
 #
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1
 #
@@ -13,7 +13,7 @@ function Say  { param($m) Write-Host "  $m" }
 function Fail { param($m) Write-Host ""; Write-Host "  ERROR: $m" -ForegroundColor Red; Write-Host ""; exit 1 }
 
 Write-Host ""
-Write-Host "  RAIMOSA AI installer"
+Write-Host "  RAIMOSA installer"
 Write-Host ""
 
 # 1. Node
@@ -77,7 +77,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 Write-Host ""
-Write-Host "  RAIMOSA AI is installed."
+Write-Host "  RAIMOSA is installed."
 Write-Host ""
 Write-Host "    Start it:   $launch"
 Write-Host "    Options:    $launch --port 5000 --no-open"

@@ -1,4 +1,4 @@
-// RAIMOSA AI — MSIX full-trust entry point.
+// RAIMOSA — MSIX full-trust entry point.
 //
 // MSIX requires a real executable as the app's entry point. This minimal
 // WinExe launches the existing, tested PowerShell shell (RAIMOSA.ps1) from
@@ -27,7 +27,7 @@ internal static class Program
             // Never fail silently: tell the user exactly what is missing.
             System.Windows.Forms.MessageBox.Show(
                 "RAIMOSA could not find its shell at:\n" + shell,
-                "RAIMOSA AI");
+                "RAIMOSA");
             return 1;
         }
 
@@ -48,7 +48,7 @@ internal static class Program
         catch (Exception ex)
         {
             System.Windows.Forms.MessageBox.Show(
-                "RAIMOSA could not start:\n" + ex.Message, "RAIMOSA AI");
+                "RAIMOSA could not start:\n" + ex.Message, "RAIMOSA");
             return 1;
         }
     }

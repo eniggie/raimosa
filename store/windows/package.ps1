@@ -1,4 +1,4 @@
-# RAIMOSA AI — build a Microsoft Store MSIX package.
+# RAIMOSA — build a Microsoft Store MSIX package.
 #
 #   powershell -ExecutionPolicy Bypass -File .\store\windows\package.ps1
 #
@@ -27,7 +27,7 @@ $Version = (node -p "require('$Root/app/package.json').version") + '.0'
 function Say { param($m) Write-Host "  $m" }
 function Fail { param($m) Write-Host "`n  ERROR: $m`n" -ForegroundColor Red; exit 1 }
 
-Write-Host "`n  RAIMOSA AI — Microsoft Store package $Version`n"
+Write-Host "`n  RAIMOSA — Microsoft Store package $Version`n"
 
 # --- Locate the Windows SDK tools ---
 $makeappx = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter MakeAppx.exe -ErrorAction SilentlyContinue |
