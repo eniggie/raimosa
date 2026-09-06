@@ -4,8 +4,16 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createDesktopToolService } from "../server/desktop-tools.mjs";
+
 import { capabilityCatalog } from "../server/ovia-core.mjs";
 import { startRaimosa } from "../server/standalone.mjs";
+
+// startRaimosa() builds a service from the ambient state directory. Point that
+// at a sandbox for the whole file so an HTTP test never writes into the live
+// Sentinel registry.
+process.env.RAIMOSA_HOME = await fs.mkdtemp(
+  path.join(os.tmpdir(), "raimosa-readiness-home-"),
+);
 
 function open() {
   return createDesktopToolService({ ledgerFile: ":memory:" });

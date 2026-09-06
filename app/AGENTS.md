@@ -88,4 +88,5 @@ When implementing from a selected generated mock, treat that image as the source
 - **Realtime is the ledger.** `/events` streams new receipts; the UI refreshes on them and keeps polling as a fallback. Restart the adapter after server-side changes — a dist rebuild only refreshes the UI.
 - **Notifications are POLICY-originated.** Sentinel's own warnings (approval required, injection, budget, needs review) post a local notification through the existing adapter without All Access. Best-effort, never load-bearing.
 - Test hygiene: never race `reader.read()` against a timeout — the losing read's chunk is lost. Pump continuously and poll the buffer.
+- **A test may never touch the live state database.** `createDesktopToolService` throws under `NODE_TEST_CONTEXT` when no explicit `stateFile` is given and `RAIMOSA_HOME` is unset — passing only a `ledgerFile` used to fall through to the owner's real Sentinel registry and wrote fixture agents ("A", "B") and tasks ("x", "t") rooted in temp directories into it. Tests pass `{ ledgerFile, stateFile }` from a sandbox, or set `RAIMOSA_HOME` when they spawn a real server. Pinned by `tests/no-fake-features.test.mjs`.
 

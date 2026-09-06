@@ -111,14 +111,15 @@ test("removing a receipt breaks the chain rather than passing silently", async (
 test("adapter receipts written by the service persist across service restarts", async () => {
   const file = await tempLedgerFile("service");
 
-  const first = createDesktopToolService({ ledgerFile: file });
+  const stateFile = `${file}.state`;
+  const first = createDesktopToolService({ ledgerFile: file, stateFile });
   await first.scanRuntime();
   const beforeRestart = first.listReceipts();
   assert.equal(beforeRestart.durable, true);
   assert.ok(beforeRestart.count >= 1);
   first.closeLedger();
 
-  const second = createDesktopToolService({ ledgerFile: file });
+  const second = createDesktopToolService({ ledgerFile: file, stateFile });
   const afterRestart = second.listReceipts();
   assert.equal(afterRestart.count, beforeRestart.count);
   assert.equal(afterRestart.receipts[0].tool, "raimosa-health-scan");
@@ -128,7 +129,10 @@ test("adapter receipts written by the service persist across service restarts", 
 
 test("the health scan reports ledger durability and integrity as real checks", async () => {
   const file = await tempLedgerFile("scan");
-  const service = createDesktopToolService({ ledgerFile: file });
+  const service = createDesktopToolService({
+    ledgerFile: file,
+    stateFile: `${file}.state`,
+  });
   const scan = await service.scanRuntime();
   const checks = new Map(scan.result.checks.map((c) => [c.id, c]));
 

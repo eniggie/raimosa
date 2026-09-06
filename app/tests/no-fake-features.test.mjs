@@ -117,3 +117,26 @@ test("intent matching uses whole words, not bare substrings", () => {
   // Unrecognized input still fails closed.
   assert.equal(planCommand("xyzzy plugh").decision, "clarification-needed");
 });
+
+// A test that forgets an explicit stateFile used to silently write its
+// fixtures into the owner's live Sentinel registry — agents named "A", tasks
+// named "x" pointing at temp directories. The service now refuses instead.
+test("a test cannot construct the service against the live state database", async () => {
+  const { createDesktopToolService } =
+    await import("../server/desktop-tools.mjs");
+  const previousHome = process.env.RAIMOSA_HOME;
+  delete process.env.RAIMOSA_HOME;
+  try {
+    assert.throws(
+      () => createDesktopToolService({ ledgerFile: "/tmp/raimosa-guard.db" }),
+      /would write into the live state database/,
+      "a real ledgerFile without a stateFile must be refused under test",
+    );
+    // The isolated forms stay allowed.
+    const memory = createDesktopToolService({ ledgerFile: ":memory:" });
+    memory.closeLedger();
+  } finally {
+    if (previousHome === undefined) delete process.env.RAIMOSA_HOME;
+    else process.env.RAIMOSA_HOME = previousHome;
+  }
+});

@@ -12,6 +12,12 @@ const appRoot = path.resolve(
   "..",
 );
 
+// startRaimosa() builds a service from the ambient state directory. Point that
+// at a sandbox so an HTTP test never writes into the live Sentinel registry.
+process.env.RAIMOSA_HOME = await fs.mkdtemp(
+  path.join(os.tmpdir(), "raimosa-install-home-"),
+);
+
 test("the installed runtime serves the interface and the API without Vite", async () => {
   const { server, url } = await startRaimosa({ port: 4290, host: "127.0.0.1" });
   try {

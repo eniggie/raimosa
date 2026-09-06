@@ -1317,12 +1317,29 @@ export function createDesktopToolService(options = {}) {
   const ledger = createLedger(
     options.ledgerFile ?? path.join(stateDir, "ledger.db"),
   );
-  const state = createStateStore(
+  // A test that passes a ledgerFile but forgets stateFile used to fall back to
+  // the real state database and write its fixtures into the owner's Sentinel
+  // registry — agents named "A", tasks named "x" pointing at deleted temp
+  // directories. Refuse loudly instead of polluting live state.
+  const stateFile =
     options.stateFile ??
-      (options.ledgerFile === ":memory:"
-        ? ":memory:"
-        : path.join(stateDir, "state.db")),
-  );
+    (options.ledgerFile === ":memory:"
+      ? ":memory:"
+      : path.join(stateDir, "state.db"));
+  // RAIMOSA_HOME already redirects the whole state directory, so a spawned
+  // server under a sandbox home is properly isolated; only a true fallback to
+  // the checkout or the owner's home is a leak.
+  if (
+    process.env.NODE_TEST_CONTEXT &&
+    !options.stateFile &&
+    !process.env.RAIMOSA_HOME &&
+    stateFile !== ":memory:"
+  ) {
+    throw new Error(
+      "A test constructed the service without an explicit stateFile, which would write into the live state database. Pass { ledgerFile, stateFile } from a sandbox.",
+    );
+  }
+  const state = createStateStore(stateFile);
 
   function record(nextReceipt) {
     const redactor = LEDGER_REDACTORS[nextReceipt.tool];
