@@ -135,8 +135,10 @@ exists. Anything else is explained but never given a button.
 
 ## Safety model
 
-- The adapter API answers **loopback requests only**. A paired phone is limited to
-  your local network and to a session you started and can revoke.
+- The adapter API answers **loopback requests only**, and the interface itself is
+  served to this machine alone. A paired phone is the single exception: it may load
+  `/remote` and the bundle that page needs from your local network, and is otherwise
+  limited to a token-bound session you started and can revoke.
 - **All Access** is a short, visible, expiring session. It never survives a restart:
   if the runtime stops, authority is revoked and recorded, never resumed.
 - **Emergency stop** is a durable server-side latch. While it is set, every adapter

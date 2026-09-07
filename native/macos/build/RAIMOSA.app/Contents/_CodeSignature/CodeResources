@@ -8,17 +8,21 @@
 		<data>
 		I1ChzYzfzjy3fV2Pj8Pr/N57Omo=
 		</data>
+		<key>Resources/app/bin/raimosa-mcp.mjs</key>
+		<data>
+		Odx/olwaKP6ijJnsDGhrjQpHcPs=
+		</data>
 		<key>Resources/app/bin/raimosa.mjs</key>
 		<data>
-		3OgdP7VVwFLOdFmAb7ljRgmDtjg=
+		prqJjl7GGeuM8npKvuE0dC2F5Y8=
 		</data>
-		<key>Resources/app/dist/assets/index-B4NE8lv4.js</key>
+		<key>Resources/app/dist/assets/index-BVjTFbfW.js</key>
 		<data>
-		Got6tihbNzs2WJtHn2ukEzpcHQM=
+		lpPbjFRqawOY6YDN8XWrqwyY1xc=
 		</data>
-		<key>Resources/app/dist/assets/index-CCdLl3P4.css</key>
+		<key>Resources/app/dist/assets/index-CJ-V4j0a.css</key>
 		<data>
-		a8LAdfpKxoMZ30l7jMKq0JykPx4=
+		+d2CrxtIiOav9968TMYKys87wbA=
 		</data>
 		<key>Resources/app/dist/assets/inter-latin-400-normal-C38fXH4l.woff2</key>
 		<data>
@@ -82,31 +86,63 @@
 		</data>
 		<key>Resources/app/dist/index.html</key>
 		<data>
-		HilPz3Abv/nbD4ThNTD43sZzV20=
+		ML9fuClTapornDt0NqIkR9EBCQk=
 		</data>
 		<key>Resources/app/package.json</key>
 		<data>
-		CTiLeVclh7V/f5mUylWUux2oALM=
+		f7G4maDmbVcABqpFy5sNHlt59dI=
 		</data>
 		<key>Resources/app/server/api-router.mjs</key>
 		<data>
-		v8VG0+M8mX76MXWmi+VL9k8UFms=
+		rHHyUMiSIMUdDQAN4uPzh1+3hd8=
 		</data>
 		<key>Resources/app/server/desktop-tools.mjs</key>
 		<data>
-		3I8lElaF9EFvrp2lDAyeaaJY0+4=
+		3/2Svc/0Ew+rsVvEOEodYXrpcZA=
 		</data>
 		<key>Resources/app/server/ledger.mjs</key>
 		<data>
-		vBM8OUmXMbvyPjLJwjR9wf5Q6ks=
+		XMACtrcdHVovEUF+9ly6R1OP5Gc=
+		</data>
+		<key>Resources/app/server/licensing.mjs</key>
+		<data>
+		9Uzwv/BYmrszyZow9/Gkg8Wjm+M=
+		</data>
+		<key>Resources/app/server/memory.mjs</key>
+		<data>
+		MMddaTjH415l9uxuNI0pm3Z+xD8=
+		</data>
+		<key>Resources/app/server/narrator.mjs</key>
+		<data>
+		22E/N+16pTWh54UjW6sCu05PlHQ=
 		</data>
 		<key>Resources/app/server/ovia-core.mjs</key>
 		<data>
-		PDg1ae8MGWRIvWYeVhDQq8lj8bs=
+		/qdAIbOAhTTWLlUZelz7hppSjrk=
+		</data>
+		<key>Resources/app/server/provenance.mjs</key>
+		<data>
+		c0iWFhK/shG4TQsbo+3RNjMpIGo=
+		</data>
+		<key>Resources/app/server/providers.mjs</key>
+		<data>
+		RwoqBhdtSisLTI6sut+BMZz4M/M=
+		</data>
+		<key>Resources/app/server/providers/anthropic.mjs</key>
+		<data>
+		XZqJIJXGD/pCXa0pAMlTzto0UgY=
+		</data>
+		<key>Resources/app/server/providers/openai.mjs</key>
+		<data>
+		a2ZeCS6QbzVcWzp7OgOcs+6K2z0=
 		</data>
 		<key>Resources/app/server/raimosa-plugin.mjs</key>
 		<data>
 		WtcdU4N+rZP7ajUWaWxfDBIyZ1A=
+		</data>
+		<key>Resources/app/server/sentinel.mjs</key>
+		<data>
+		LQS3GNQb8F6p4MeIXRE1dVR48io=
 		</data>
 		<key>Resources/app/server/standalone.mjs</key>
 		<data>
@@ -116,9 +152,13 @@
 		<data>
 		aKXl51tJuXm2vgkyDqJKckoe964=
 		</data>
+		<key>Resources/app/server/vault.mjs</key>
+		<data>
+		wMzVuwlsOQJEBm+5umuxwBrqlI0=
+		</data>
 		<key>Resources/runtime/bin/node</key>
 		<data>
-		W023Ct7SpNkEaCtC6KFCEnzFNDY=
+		COgTqRmKkqeS5gB+gz646O/H6T4=
 		</data>
 	</dict>
 	<key>files2</key>
@@ -130,25 +170,32 @@
 			/zN95VYBAsUTpHBjnvlE0pjBod36mb4gb4MCk1V0CTE=
 			</data>
 		</dict>
+		<key>Resources/app/bin/raimosa-mcp.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			sFgT4yJbeZUsV59JmtdFIzsaDE6EB1XU6o8m6vhY4dk=
+			</data>
+		</dict>
 		<key>Resources/app/bin/raimosa.mjs</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			WuVtl+GXPS9yoTclCpa0w0ARjRHRuyaJUT5MVWBVeG8=
+			ONfgHm3UUxF2O2/fn1B6qVVO/JhQmnXC9Mq4jbgwxXA=
 			</data>
 		</dict>
-		<key>Resources/app/dist/assets/index-B4NE8lv4.js</key>
+		<key>Resources/app/dist/assets/index-BVjTFbfW.js</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			fXofyrxwHM76yM6zVA0HQskd+cMgBq/f27pUK8TsAsI=
+			r9RdbNIDWx5BdL1AeTtIW7988SXTmqZgtea92gEmWQk=
 			</data>
 		</dict>
-		<key>Resources/app/dist/assets/index-CCdLl3P4.css</key>
+		<key>Resources/app/dist/assets/index-CJ-V4j0a.css</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			tjDoJH2kBk5dgumP4EhPPiW5VG36kc4ZP+Bwvfxib8A=
+			tSXNcIEx7f6fqK1652TPUFhFHTXiqqwTleRnUM2qxso=
 			</data>
 		</dict>
 		<key>Resources/app/dist/assets/inter-latin-400-normal-C38fXH4l.woff2</key>
@@ -260,42 +307,91 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			+Ds1135Qqtd/s9R1fbxapAfJdNO3tALb7Laam988bPk=
+			V9LipyWj46fUlvGAOxGWluMSQlXI2xKp4gFMWzf8mMw=
 			</data>
 		</dict>
 		<key>Resources/app/package.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			/wFvWCpglNIGLME4xp68TKybiGKwMOdkLPoTQnKpErQ=
+			1cGwrmoiHVYr9m8amtaCLcx14CmKRkwAS6R0wPxzkBk=
 			</data>
 		</dict>
 		<key>Resources/app/server/api-router.mjs</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			CrvDgSumWDB3nebVQH0sjZF7JxHZgbDTXyWObIPvlH8=
+			RfMHOdf3nzFr7DSCsHErmAjLCaERc9gKkAOpDG3ypYw=
 			</data>
 		</dict>
 		<key>Resources/app/server/desktop-tools.mjs</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			ZuIu0T2hXHK0M8eAdu0er25L8p1g6ZraVJfFgHkqopo=
+			7W5O6FYKF6/AvfraJIH0iDuuadH4aboDvQeJOnNsgJ0=
 			</data>
 		</dict>
 		<key>Resources/app/server/ledger.mjs</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			JFR3IUc4cXP9C+Ua3Ve4tH43ZB3q4EzL2LS0gXkf2tA=
+			3CnTjxidICfbIEDqq1zIdI9+4wKn/tdY+tH1kgRPNjE=
+			</data>
+		</dict>
+		<key>Resources/app/server/licensing.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			NA8wcxODxMe1bhG9bO0gzdwivwKWERpkNN5cTSe7GbE=
+			</data>
+		</dict>
+		<key>Resources/app/server/memory.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Wcj0csDwom/mw46BheTa6/QV3DAYUSAsDt2lpxW/D8w=
+			</data>
+		</dict>
+		<key>Resources/app/server/narrator.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			xBnifw1GXQYhEFay0F1GfWNtf64xMqOP72Ew42hPx/E=
 			</data>
 		</dict>
 		<key>Resources/app/server/ovia-core.mjs</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			m9xPlhWXeWPSnOvRnqGmJmNhBxLqMntdjxyn/C3Rxvk=
+			mY8J16L523O2IZEh19IjtexVLFCZg/MPhf+iR8AWHE4=
+			</data>
+		</dict>
+		<key>Resources/app/server/provenance.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			n08ytHJTDjeoYwAzc8V+QrREDCj7IPDbtMfcTlBTc4I=
+			</data>
+		</dict>
+		<key>Resources/app/server/providers.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			+Fo45GKfv95TGs6lOpgjWg9iO8nJjirFu23K71KusHo=
+			</data>
+		</dict>
+		<key>Resources/app/server/providers/anthropic.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jaujUCiAQ4Ou4uf47g9E0oV0tl7TqQmn/HPGEiH1WU8=
+			</data>
+		</dict>
+		<key>Resources/app/server/providers/openai.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			EFw0uQPjJjRJwACmU2QRTNaRzQyXiCNvCA1rAM2E8lE=
 			</data>
 		</dict>
 		<key>Resources/app/server/raimosa-plugin.mjs</key>
@@ -303,6 +399,13 @@
 			<key>hash2</key>
 			<data>
 			f14i9JgIBF3GQ82ZaXsUPxKncFwUdR9G+sY2JP3LaIs=
+			</data>
+		</dict>
+		<key>Resources/app/server/sentinel.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			7u48rKT0c/yxgtiPjjWlxclRhOJCHbvpexH9QNQ8pH0=
 			</data>
 		</dict>
 		<key>Resources/app/server/standalone.mjs</key>
@@ -319,11 +422,18 @@
 			hUkeW5x21GZlB6RkILnqoDO4C//YWfnuxqmFJE6PFYo=
 			</data>
 		</dict>
+		<key>Resources/app/server/vault.mjs</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			HGWQLgxt5p3WFtiyBCP2/M0MJJ3eM4zTI5JGmERJpw4=
+			</data>
+		</dict>
 		<key>Resources/runtime/bin/node</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			8+SPP34d51a95VGmzXFtw910HuLe3+LJw1LMQg+dpDE=
+			Bsl0zvFXJBkNebEdH8n8EOuLOSAg7MZ5qK2NePMhNIY=
 			</data>
 		</dict>
 	</dict>

@@ -59,9 +59,11 @@ this particular build was not notarized; right-click the app and choose Open.)
 
 Nothing else is required. Node is bundled inside the app.
 
-RAIMOSA runs entirely on your machine. Its adapter API answers loopback
-requests only, and every action it takes writes a hash-chained receipt you
-can read and export from the Ledger screen.
+RAIMOSA runs entirely on your machine. Its desktop adapters answer loopback
+requests only, and its interface is served to this Mac alone. Pairing a phone
+is the one exception: that opens a /remote page and a token-bound session on
+your local network, which you start and can revoke. Every action RAIMOSA takes
+writes a hash-chained receipt you can read and export from the Ledger screen.
 
 © ECONTEUR LLC
 NOTE

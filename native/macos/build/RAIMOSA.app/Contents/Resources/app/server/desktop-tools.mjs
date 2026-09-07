@@ -8,8 +8,39 @@ import dns from "node:dns/promises";
 import { capabilityCatalog, oviaDoctrine, planCommand } from "./ovia-core.mjs";
 import { createLedger } from "./ledger.mjs";
 import { createStateStore } from "./state-store.mjs";
+import { createSentinel } from "./sentinel.mjs";
+import { providerSummary, registerProvider } from "./providers.mjs";
+import { createVault } from "./vault.mjs";
+import { createOpenAIProvider } from "./providers/openai.mjs";
+import { createAnthropicProvider } from "./providers/anthropic.mjs";
+import { route as routeProvider } from "./providers.mjs";
+import { createMemory } from "./memory.mjs";
+import { answer as narrate } from "./narrator.mjs";
+import {
+  verifyLicenseKey,
+  requiresPro,
+  PRO_TOOLS,
+  PRO_FEATURES,
+} from "./licensing.mjs";
 
 const execFileAsync = promisify(execFile);
+
+// Some adapters are dispatch-only: they hand a request to the operating system
+// and cannot observe what it does, which is why their receipts say
+// `verified: false`. They also genuinely reach the desktop — opening windows,
+// posting notifications, quitting apps, sleeping the machine. A test run must
+// never do that. Running `npm test` on this Mac opened a TextEdit window and
+// fired a real notification every time, because two suites exercise those
+// authorisation paths for real. Nothing any test asserts depends on the process
+// actually launching, so under `node --test` the request is skipped and the
+// adapter name is returned unchanged. Observations (df, pmset -g batt, ps,
+// pbpaste) are NOT routed through here: reading the machine is not a side
+// effect, and stubbing it would make the tests lie.
+const IN_TEST_RUN = Boolean(process.env.NODE_TEST_CONTEXT);
+const dispatchExec = (...args) =>
+  IN_TEST_RUN
+    ? Promise.resolve({ stdout: "", stderr: "" })
+    : execFileAsync(...args);
 const TEXT_EXTENSIONS = new Set([
   ".txt",
   ".md",
@@ -146,15 +177,28 @@ export function defaultWorkspace() {
   return path.join(os.homedir(), "RAIMOSA Workspace");
 }
 
-function receipt(tool, scope, result) {
+// `verified` is evidence, not decoration: it means RAIMOSA observed the result,
+// not merely that the call returned without throwing. Adapters that can only
+// hand a request to the operating system — launching or quitting an app,
+// opening a document, posting a notification, sleeping the machine — cannot
+// observe the outcome from inside this runtime, so they must record
+// `verified: false`. Marking those true would make the exported ledger claim
+// proof it does not have.
+function receipt(tool, scope, result, { verified = true } = {}) {
   return {
     id: `RC-${randomUUID().slice(0, 8).toUpperCase()}`,
     tool,
     scope,
     timestamp: new Date().toISOString(),
-    verified: true,
+    verified,
     result,
   };
+}
+
+// A receipt whose result only records that a request was accepted, never that
+// it completed.
+function dispatchReceipt(tool, scope, result) {
+  return receipt(tool, scope, result, { verified: false });
 }
 
 // Remote and pairing records reference the All Access session that authorised
@@ -227,22 +271,38 @@ async function containedPath(root, relativePath, { mustExist = true } = {}) {
   return real;
 }
 
-async function walk(root, { depth = 0, results = [] } = {}) {
+async function walk(root, { depth = 0, results = [], base = root } = {}) {
   if (depth > MAX_DEPTH || results.length >= MAX_FILES) return results;
   const entries = await fs.readdir(root, { withFileTypes: true });
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (entry.name === ".DS_Store" || entry.name.startsWith(".")) continue;
     const absolute = path.join(root, entry.name);
-    const stat = await fs.stat(absolute);
+    // A symlink can point outside the approved root. Following it — even just
+    // to stat its target's size and mtime — leaks the existence and shape of
+    // files the caller never approved. Include a symlink only when its real
+    // target stays inside the approved base; otherwise skip it entirely. This
+    // is the same containment rule preview-file enforces, applied to the walk.
+    if (entry.isSymbolicLink()) {
+      let realTarget;
+      try {
+        realTarget = await fs.realpath(absolute);
+      } catch {
+        continue;
+      }
+      if (realTarget !== base && !realTarget.startsWith(`${base}${path.sep}`))
+        continue;
+    }
+    const stat = await fs.stat(absolute).catch(() => null);
+    if (!stat) continue;
     results.push({
       absolute,
       name: entry.name,
-      type: entry.isDirectory() ? "folder" : "file",
-      size: entry.isDirectory() ? 0 : stat.size,
+      type: stat.isDirectory() ? "folder" : "file",
+      size: stat.isDirectory() ? 0 : stat.size,
       modifiedAt: stat.mtime.toISOString(),
     });
-    if (entry.isDirectory())
-      await walk(absolute, { depth: depth + 1, results });
+    if (stat.isDirectory())
+      await walk(absolute, { depth: depth + 1, results, base });
     if (results.length >= MAX_FILES) break;
   }
   return results;
@@ -638,7 +698,7 @@ async function compareFolders(payload) {
   });
 }
 
-async function readClipboard() {
+async function rawClipboardText() {
   let text = "";
   if (process.platform === "darwin") {
     const { stdout } = await execFileAsync("/usr/bin/pbpaste", [], {
@@ -665,6 +725,11 @@ async function readClipboard() {
     });
     text = stdout;
   }
+  return text;
+}
+
+async function readClipboard() {
+  const text = await rawClipboardText();
   const content = text.slice(0, 16 * 1024);
   return receipt("read-clipboard", "system clipboard", {
     characters: text.length,
@@ -695,11 +760,25 @@ async function writeClipboard(payload) {
         "Writing the clipboard on Linux needs xclip. Install it and try again.",
       );
     });
-  return receipt("write-clipboard", "system clipboard", {
-    characters: bounded.length,
-    truncated: bounded.length < text.length,
-    content: bounded,
-  });
+  // Exit code 0 only proves the helper ran. Read the clipboard back so the
+  // receipt reports an observed result rather than an assumed one.
+  const readBack = await rawClipboardText().catch(() => null);
+  const confirmed =
+    readBack !== null && readBack.replace(/\r\n/g, "\n") === bounded;
+  return receipt(
+    "write-clipboard",
+    "system clipboard",
+    {
+      characters: bounded.length,
+      truncated: bounded.length < text.length,
+      content: bounded,
+      state: confirmed ? "clipboard-confirmed" : "write-dispatched",
+      verification: confirmed
+        ? "The clipboard was read back and matches exactly."
+        : "The write command succeeded but the clipboard could not be read back to confirm it.",
+    },
+    { verified: confirmed },
+  );
 }
 
 async function captureScreen(payload) {
@@ -754,13 +833,13 @@ async function systemPower(payload) {
 
   if (process.platform === "darwin") {
     if (action === "sleep")
-      await execFileAsync("/usr/bin/pmset", ["sleepnow"], { timeout: 10_000 });
+      await dispatchExec("/usr/bin/pmset", ["sleepnow"], { timeout: 10_000 });
     else if (action === "display-sleep")
-      await execFileAsync("/usr/bin/pmset", ["displaysleepnow"], {
+      await dispatchExec("/usr/bin/pmset", ["displaysleepnow"], {
         timeout: 10_000,
       });
     else
-      await execFileAsync(
+      await dispatchExec(
         "/usr/bin/osascript",
         ["-e", `tell application "System Events" to ${action}`],
         { timeout: 15_000 },
@@ -776,7 +855,7 @@ async function systemPower(payload) {
       throw new Error(
         `${action} has no verified adapter on Windows. Use restart or shutdown.`,
       );
-    await execFileAsync("shutdown.exe", args, {
+    await dispatchExec("shutdown.exe", args, {
       timeout: 15_000,
       windowsHide: true,
     });
@@ -793,10 +872,10 @@ async function systemPower(payload) {
       throw new Error(
         `${action} has no verified adapter on ${process.platform}.`,
       );
-    await execFileAsync("systemctl", args, { timeout: 15_000 });
+    await dispatchExec("systemctl", args, { timeout: 15_000 });
   }
 
-  return receipt("system-power", "this device", {
+  return dispatchReceipt("system-power", "this device", {
     action,
     platform: process.platform,
     state: "dispatch-accepted",
@@ -966,16 +1045,19 @@ async function validateApplication(appPath) {
 // Every platform opens a discovered target with its own OS opener, and the
 // target is always a validated path from the discovery list — never free text.
 async function openWithSystemOpener(target) {
+  // The adapter name lands in a receipt, so it says when nothing was launched
+  // rather than implying a window that does not exist.
+  const suffix = IN_TEST_RUN ? "-suppressed-in-test" : "";
   if (process.platform === "darwin") {
-    await execFileAsync("/usr/bin/open", ["-g", target], { timeout: 10_000 });
-    return "macos-open";
+    await dispatchExec("/usr/bin/open", ["-g", target], { timeout: 10_000 });
+    return `macos-open${suffix}`;
   }
   if (process.platform === "linux") {
-    await execFileAsync("xdg-open", [target], { timeout: 10_000 });
-    return "linux-xdg-open";
+    await dispatchExec("xdg-open", [target], { timeout: 10_000 });
+    return `linux-xdg-open${suffix}`;
   }
   if (process.platform === "win32") {
-    await execFileAsync(
+    await dispatchExec(
       "powershell.exe",
       [
         "-NoProfile",
@@ -986,7 +1068,7 @@ async function openWithSystemOpener(target) {
       ],
       { timeout: 15_000, windowsHide: true },
     );
-    return "windows-start-process";
+    return `windows-start-process${suffix}`;
   }
   throw new Error(`Opening is not implemented for ${process.platform}.`);
 }
@@ -994,7 +1076,7 @@ async function openWithSystemOpener(target) {
 async function launchApplication(payload) {
   const app = await validateApplication(payload.appPath);
   const adapter = await openWithSystemOpener(app.path);
-  return receipt("launch-application", app.path, {
+  return dispatchReceipt("launch-application", app.path, {
     application: app.name,
     adapter,
     state: "launch-request-accepted",
@@ -1005,14 +1087,14 @@ async function closeApplication(payload) {
   const app = await validateApplication(payload.appPath);
   if (process.platform === "darwin") {
     const script = `tell application "${escapeAppleScript(app.name)}" to quit`;
-    await execFileAsync("/usr/bin/osascript", ["-e", script], {
+    await dispatchExec("/usr/bin/osascript", ["-e", script], {
       timeout: 10_000,
     });
   } else if (process.platform === "win32") {
     // A Start Menu shortcut name is not necessarily the process name, so the
     // result must report how many windows were actually asked to close.
     // Claiming success when nothing matched would be a false receipt.
-    const { stdout } = await execFileAsync(
+    const { stdout } = await dispatchExec(
       "powershell.exe",
       [
         "-NoProfile",
@@ -1027,7 +1109,7 @@ async function closeApplication(payload) {
     );
     const asked = Number(String(stdout).trim());
     if (!Number.isFinite(asked) || asked === 0) {
-      return receipt("close-application", app.path, {
+      return dispatchReceipt("close-application", app.path, {
         application: app.name,
         windowsAsked: 0,
         state: "no-matching-window",
@@ -1035,7 +1117,7 @@ async function closeApplication(payload) {
           "No running window matched this application, so nothing was closed. A Start Menu shortcut name can differ from the running process name.",
       });
     }
-    return receipt("close-application", app.path, {
+    return dispatchReceipt("close-application", app.path, {
       application: app.name,
       windowsAsked: asked,
       state: "quit-request-accepted",
@@ -1045,7 +1127,7 @@ async function closeApplication(payload) {
       `Quitting applications is not implemented for ${process.platform}.`,
     );
   }
-  return receipt("close-application", app.path, {
+  return dispatchReceipt("close-application", app.path, {
     application: app.name,
     state: "quit-request-accepted",
   });
@@ -1179,25 +1261,25 @@ async function monitorAgentRuntimes() {
 }
 
 async function localNotification(payload) {
-  const rawTitle = String(payload.title ?? "RAIMOSA AI").slice(0, 80);
+  const rawTitle = String(payload.title ?? "RAIMOSA").slice(0, 80);
   const rawMessage = String(payload.message ?? "").slice(0, 240);
   if (!rawMessage) throw new Error("Notification text is required.");
 
   if (process.platform === "darwin") {
     const title = escapeAppleScript(rawTitle);
     const message = escapeAppleScript(rawMessage);
-    await execFileAsync(
+    await dispatchExec(
       "/usr/bin/osascript",
       ["-e", `display notification "${message}" with title "${title}"`],
       { timeout: 10_000 },
     );
   } else if (process.platform === "linux") {
     // Arguments are passed as argv, never interpolated into a shell string.
-    await execFileAsync("notify-send", [rawTitle, rawMessage], {
+    await dispatchExec("notify-send", [rawTitle, rawMessage], {
       timeout: 10_000,
     });
   } else if (process.platform === "win32") {
-    await execFileAsync(
+    await dispatchExec(
       "powershell.exe",
       [
         "-NoProfile",
@@ -1208,7 +1290,7 @@ async function localNotification(payload) {
           "$n=$t.GetElementsByTagName('text');" +
           "$n.Item(0).AppendChild($t.CreateTextNode($args[0])) > $null;" +
           "$n.Item(1).AppendChild($t.CreateTextNode($args[1])) > $null;" +
-          "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('RAIMOSA AI').Show([Windows.UI.Notifications.ToastNotification]::new($t))",
+          "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('RAIMOSA').Show([Windows.UI.Notifications.ToastNotification]::new($t))",
         rawTitle,
         rawMessage,
       ],
@@ -1220,7 +1302,7 @@ async function localNotification(payload) {
     );
   }
 
-  return receipt("local-notification", "current desktop user", {
+  return dispatchReceipt("local-notification", "current desktop user", {
     title: rawTitle,
     message: rawMessage,
     platform: process.platform,
@@ -1235,7 +1317,7 @@ async function openDocument(payload) {
   if (!stat.isFile())
     throw new Error("Choose one file inside the approved folder.");
   const adapter = await openWithSystemOpener(file);
-  return receipt("open-document", root, {
+  return dispatchReceipt("open-document", root, {
     path: path.relative(root, file),
     adapter,
     state: "open-request-accepted",
@@ -1255,12 +1337,29 @@ export function createDesktopToolService(options = {}) {
   const ledger = createLedger(
     options.ledgerFile ?? path.join(stateDir, "ledger.db"),
   );
-  const state = createStateStore(
+  // A test that passes a ledgerFile but forgets stateFile used to fall back to
+  // the real state database and write its fixtures into the owner's Sentinel
+  // registry — agents named "A", tasks named "x" pointing at deleted temp
+  // directories. Refuse loudly instead of polluting live state.
+  const stateFile =
     options.stateFile ??
-      (options.ledgerFile === ":memory:"
-        ? ":memory:"
-        : path.join(stateDir, "state.db")),
-  );
+    (options.ledgerFile === ":memory:"
+      ? ":memory:"
+      : path.join(stateDir, "state.db"));
+  // RAIMOSA_HOME already redirects the whole state directory, so a spawned
+  // server under a sandbox home is properly isolated; only a true fallback to
+  // the checkout or the owner's home is a leak.
+  if (
+    process.env.NODE_TEST_CONTEXT &&
+    !options.stateFile &&
+    !process.env.RAIMOSA_HOME &&
+    stateFile !== ":memory:"
+  ) {
+    throw new Error(
+      "A test constructed the service without an explicit stateFile, which would write into the live state database. Pass { ledgerFile, stateFile } from a sandbox.",
+    );
+  }
+  const state = createStateStore(stateFile);
 
   function record(nextReceipt) {
     const redactor = LEDGER_REDACTORS[nextReceipt.tool];
@@ -1304,10 +1403,93 @@ export function createDesktopToolService(options = {}) {
 
   const recovery = recoverInterruptedAuthority();
 
+  // Licensing. RAIMOSA Free is the full governed loop; Pro unlocks the tools
+  // that command the machine. The license is a signed token (not a secret),
+  // stored durably and verified offline on every check, so a tampered flag
+  // cannot grant Pro.
+  function licenseStatus() {
+    const stored = state.getFlag("license");
+    if (!stored?.key) return { tier: "free", pro: false };
+    const check = verifyLicenseKey(stored.key);
+    if (!check.valid) return { tier: "free", pro: false, error: check.reason };
+    return {
+      tier: "pro",
+      pro: true,
+      holder: check.holder,
+      issuedAt: check.issuedAt,
+    };
+  }
+
+  function activateLicense(payload = {}) {
+    const check = verifyLicenseKey(payload.key);
+    if (!check.valid) throw new Error(check.reason);
+    state.setFlag("license", { key: String(payload.key).trim() });
+    record(
+      receipt("license-activated", "RAIMOSA licensing", {
+        tier: check.tier,
+        holder: check.holder,
+        issuedAt: check.issuedAt,
+      }),
+    );
+    return { ok: true, ...licenseStatus() };
+  }
+
+  function removeLicense() {
+    const was = licenseStatus();
+    state.clearFlag("license");
+    if (was.pro)
+      record(receipt("license-removed", "RAIMOSA licensing", { tier: "free" }));
+    return { ok: true, ...licenseStatus() };
+  }
+
+  function requirePro(name) {
+    if (!requiresPro(name)) return;
+    if (!licenseStatus().pro)
+      throw new Error(
+        "This is a RAIMOSA Pro tool. Activate a Pro license to unlock the desktop-commander tools (app control, clipboard, screen capture, power, and mobile remote).",
+      );
+  }
+
   // Emergency stop is a durable server-side latch, not a UI state. While
   // latched, every adapter dispatch, All Access grant, and pairing action is
   // refused at the server, and the latch survives a runtime restart until the
   // owner explicitly clears it.
+  // Sentinel shares the durable state file and writes every decision to the
+  // same ledger as every other action. It is given only what it needs: the
+  // latch, the symlink-safe root resolver, and the live-access lookup.
+  // Memory holds facts, never secrets; Sentinel writes verification memory
+  // through a hook so an agent can never author its own track record.
+  const memory = createMemory({ stateFile: state.file, record, receipt });
+  const sentinel = createSentinel({
+    stateFile: state.file,
+    record,
+    receipt,
+    isLatched: () => Boolean(state.getFlag("emergency-stop")),
+    approvedRoot,
+    hooks: {
+      onVerified: (info) => memory.recordVerification(info),
+      // Sentinel's own warnings are POLICY-originated, so they may post a
+      // local desktop notification without an All Access session. Best-effort.
+      onNotify: (n) =>
+        void sendLocalNotification({ title: n.title, message: n.body }).catch(
+          () => {},
+        ),
+    },
+  });
+
+  // The credential vault brokers the OS keychain. RAIMOSA's DB holds names
+  // only; no API route ever returns a value. Tests inject a memory backend.
+  const vault = createVault({
+    stateFile: state.file,
+    record,
+    receipt,
+    backend: options.vaultBackend,
+  });
+  // Provider adapters read their keys from the vault in-process and report
+  // configured:false until one exists. Registering is idempotent.
+  registerProvider(createOpenAIProvider({ vault }));
+  registerProvider(createAnthropicProvider({ vault }));
+
   function emergencyStatus() {
     const latch = state.getFlag("emergency-stop");
     return {
@@ -1331,6 +1513,8 @@ export function createDesktopToolService(options = {}) {
     state.deleteAll("remote");
     state.deleteAll("pairing");
     state.setFlag("emergency-stop", { reason: "owner-request" });
+    // STOP ALL AGENTS: every registered agent is paused under the same latch.
+    const pausedAgents = sentinel.pauseAll("emergency-stop");
     record(
       receipt("emergency-stop", "local desktop authority", {
         state: "latched",
@@ -1340,7 +1524,18 @@ export function createDesktopToolService(options = {}) {
           "All adapter dispatch is blocked at the server until the latch is cleared.",
       }),
     );
-    return { ok: true, ...emergencyStatus() };
+    // Report what was actually revoked. The recovery UI states these as facts,
+    // so they must come from the server that did the revoking — never from a
+    // static checklist the interface merely asserts.
+    return {
+      ok: true,
+      ...emergencyStatus(),
+      revoked: {
+        accessSessions: accessSessions.length,
+        remoteSessions: remoteCount,
+        agents: pausedAgents.length,
+      },
+    };
   }
 
   function emergencyClear() {
@@ -1467,11 +1662,20 @@ export function createDesktopToolService(options = {}) {
   // revoked and a new one must be generated from the desktop.
   const MAX_PAIR_ATTEMPTS = 5;
   let failedPairAttempts = 0;
+  // After the attempt limit trips, refuse further guesses for a cooldown window.
+  // Revoking the codes alone was not enough: a guesser on the same network could
+  // burn the limit, wait for the owner to generate a fresh code, and repeat
+  // forever — locking the owner out of pairing indefinitely. The cooldown bounds
+  // guessing to MAX_PAIR_ATTEMPTS per window against a 900,000-code space.
+  let pairLockedUntil = 0;
+  const PAIR_LOCKOUT_MS = 60_000;
 
   function startRemotePairing(payload = {}) {
     requireNotLatched();
+    requirePro("mobile-remote");
     const access = requireAccess(payload.accessToken);
-    failedPairAttempts = 0;
+    // Deliberately NOT clearing failedPairAttempts here: generating a fresh code
+    // must not hand an active guesser a fresh allowance.
     const code = String(randomInt(100000, 1000000));
     const pairing = {
       id: `PAIR-${randomUUID().slice(0, 8).toUpperCase()}`,
@@ -1504,6 +1708,12 @@ export function createDesktopToolService(options = {}) {
 
   function pairRemote(payload = {}) {
     requireNotLatched();
+    if (Date.now() < pairLockedUntil) {
+      const seconds = Math.ceil((pairLockedUntil - Date.now()) / 1000);
+      throw new Error(
+        `Too many incorrect pairing codes. Try again in ${seconds}s.`,
+      );
+    }
     const code = String(payload.code ?? "").trim();
     const pairing = state.getSession("pairing", code);
     const access = pairing ? liveAccessByHash(pairing.accessTokenHash) : null;
@@ -1521,10 +1731,12 @@ export function createDesktopToolService(options = {}) {
           }),
         );
         failedPairAttempts = 0;
+        pairLockedUntil = Date.now() + PAIR_LOCKOUT_MS;
       }
       throw new Error("The pairing code is invalid or expired.");
     }
     failedPairAttempts = 0;
+    pairLockedUntil = 0;
     state.deleteSession("pairing", code);
     const token = randomUUID();
     const session = {
@@ -1808,6 +2020,23 @@ export function createDesktopToolService(options = {}) {
     // Take single-use ownership before the first file moves. If the runtime
     // dies mid-execution the claim is already on disk, so the same approved
     // plan can never be replayed into duplicate side effects.
+    // The plan receipt publishes this hash as the fingerprint of exactly what
+    // was approved. Recompute it before acting: without this check the hash is
+    // decorative, and a plan altered in the state store between approval and
+    // execution would run anyway under a receipt that still cites the original
+    // fingerprint.
+    const replayHash = createHash("sha256")
+      .update(
+        JSON.stringify({
+          root: approval.root,
+          operations: approval.operations,
+        }),
+      )
+      .digest("hex");
+    if (approval.hash && replayHash !== approval.hash)
+      throw new Error(
+        "This approved plan no longer matches its approved fingerprint. Create a new plan.",
+      );
     if (!state.claimApproval(payload.approvalId))
       throw new Error(
         "This approval was already used. Create a new plan to run it again.",
@@ -1819,7 +2048,20 @@ export function createDesktopToolService(options = {}) {
         const destination = path.resolve(approval.root, operation.destination);
         if (!destination.startsWith(`${approval.root}${path.sep}`))
           throw new Error("A destination leaves the approved folder.");
-        await fs.mkdir(path.dirname(destination), { recursive: true });
+        const parent = path.dirname(destination);
+        await fs.mkdir(parent, { recursive: true });
+        // The string check above cannot see through a symlink. A link planted
+        // inside the approved folder (e.g. "RAIMOSA Organized/Images" ->
+        // /tmp/elsewhere) is silently accepted by mkdir -p, and the rename
+        // would then move the owner's files OUT of the folder they approved
+        // while the receipt still claimed success. Resolve the real parent
+        // after creating it and refuse anything that leaves the root.
+        const realParent = await fs.realpath(parent);
+        if (
+          realParent !== approval.root &&
+          !realParent.startsWith(`${approval.root}${path.sep}`)
+        )
+          throw new Error("A destination leaves the approved folder.");
         await fs
           .access(destination)
           .then(() => {
@@ -1855,11 +2097,18 @@ export function createDesktopToolService(options = {}) {
 
   async function handle(tool, payload = {}, context = {}) {
     requireNotLatched();
+    requirePro(tool);
     const effectivePayload = { ...payload };
+    // Authority is resolved here, where the access session lives — by raw
+    // token on the desktop, by hash for a paired phone — and Sentinel's owner
+    // policy is enforced with that fact, in this one dispatch path.
+    let hasAccess = false;
     if (context.remoteToken) {
       const remote = activeRemote(context.remoteToken);
       if (!remote)
         throw new Error("The mobile remote session is expired or revoked.");
+      hasAccess = Boolean(liveAccessByHash(remote.accessTokenHash));
+      sentinel.requireLevel(tool, effectivePayload, { hasAccess });
       if (!REMOTE_TOOLS.has(tool))
         throw new Error("This tool is not available from the mobile remote.");
       // The remote record holds only a hash of the desktop access token, so
@@ -1869,8 +2118,10 @@ export function createDesktopToolService(options = {}) {
         throw new Error(
           "A live OVIA AI All Access session is required for this control.",
         );
-    } else if (CONTROL_TOOLS.has(tool)) {
-      requireAccess(effectivePayload.accessToken);
+    } else {
+      hasAccess = Boolean(activeAccess(effectivePayload.accessToken));
+      sentinel.requireLevel(tool, effectivePayload, { hasAccess });
+      if (CONTROL_TOOLS.has(tool)) requireAccess(effectivePayload.accessToken);
     }
 
     // The capability registry is the authority, not just a source of UI state.
@@ -1970,9 +2221,12 @@ export function createDesktopToolService(options = {}) {
         hostname: os.hostname(),
         defaultWorkspace: workspaceRoot,
         capabilities: capabilityCatalog,
-        doctrine: oviaDoctrine(),
+        doctrine: { ...oviaDoctrine(), ...providerSummary() },
+        sentinel: { protected: !state.getFlag("emergency-stop") },
         emergency: emergencyStatus(),
         native: process.env.RAIMOSA_NATIVE ?? null,
+        license: licenseStatus(),
+        proTools: [...PRO_TOOLS, ...PRO_FEATURES],
         remote: {
           available: true,
           mode: "paired-local-network",
@@ -1983,6 +2237,9 @@ export function createDesktopToolService(options = {}) {
     emergencyStop,
     emergencyClear,
     emergencyStatus,
+    licenseStatus,
+    activateLicense,
+    removeLicense,
     plan: planCommand,
     handle,
     startAccess,
@@ -2067,7 +2324,7 @@ export function createDesktopToolService(options = {}) {
         integrity,
         content: JSON.stringify(
           {
-            product: "RAIMOSA AI",
+            product: "RAIMOSA",
             exportedAt: new Date().toISOString(),
             host: os.hostname(),
             platform: process.platform,
@@ -2087,7 +2344,144 @@ export function createDesktopToolService(options = {}) {
       };
     },
     recovery,
+    sentinel,
+    memory,
+    memoryStatus() {
+      return { ok: true, ...memory.status(), memories: memory.recall() };
+    },
+    memoryRemember(payload = {}) {
+      requireNotLatched();
+      return {
+        ok: true,
+        memory: memory.remember({ ...payload, source: "owner" }),
+      };
+    },
+    memoryForget(payload = {}) {
+      return { ok: true, ...memory.forget(payload.id) };
+    },
+    memoryClear(payload = {}) {
+      requireAccess(payload.accessToken);
+      if (payload.confirmation !== "CONFIRM")
+        throw new Error('Type "CONFIRM" to clear all memory.');
+      return { ok: true, ...memory.forgetAll() };
+    },
+    memorySetEnabled(payload = {}) {
+      requireAccess(payload.accessToken);
+      return { ok: true, ...memory.setEnabled(Boolean(payload.enabled)) };
+    },
+    memoryExport() {
+      return {
+        ok: true,
+        filename: `raimosa-memory-${new Date().toISOString().slice(0, 10)}.json`,
+        content: JSON.stringify(memory.exportAll(), null, 2),
+      };
+    },
+    /** OVIA AI answers from records only; no model is consulted here. */
+    async oviaAsk(payload = {}) {
+      const status = await this.sentinelStatus();
+      const receipts = ledger.query({ limit: 500 });
+      const facts = narrate(payload.question, { status, receipts });
+      // With a configured text provider, OVIA AI may phrase the answer more
+      // naturally — but only from the facts established above. The model
+      // never sees a secret or raw agent text, and cannot promote a claim to
+      // a result: the facts already carry that distinction.
+      const chosen = routeProvider({ kind: "text" });
+      if (!chosen.provider || facts.kind === "empty")
+        return { ok: true, ...facts, phrasedBy: null };
+      try {
+        const out = await chosen.provider.complete({
+          system:
+            "You are OVIA AI, the voice of RAIMOSA. Rephrase the FACTS below for the owner in two or three plain sentences. " +
+            "Rules you may not break: state only what the facts say; keep 'reported/claimed' and 'verified' distinct exactly as given; " +
+            "if a fact says something is unverified, say so; never add capabilities, promises, or details not in the facts; no secrets, no code.",
+          input: `Question: ${String(payload.question ?? "").slice(0, 500)}\n\nFACTS:\n- ${facts.lines.join("\n- ")}`,
+          maxOutputTokens: 400,
+          effort: "low",
+        });
+        if (out.refused || !out.text?.trim())
+          return { ok: true, ...facts, phrasedBy: null };
+        return {
+          ok: true,
+          kind: facts.kind,
+          lines: [out.text.trim()],
+          facts: facts.lines,
+          phrasedBy: chosen.provider.id,
+        };
+      } catch {
+        // A provider failure never hides the facts.
+        return { ok: true, ...facts, phrasedBy: null };
+      }
+    },
+    queryReceipts(params = {}) {
+      return {
+        ok: true,
+        receipts: ledger.query(params),
+        integrity: ledger.verify(),
+        durable: ledger.durable,
+      };
+    },
+    ledgerCount: () => ledger.count(),
+    vault,
+    vaultStatus() {
+      return { ok: true, ...vault.status(), secrets: vault.list() };
+    },
+    async vaultPut(payload = {}) {
+      requireNotLatched();
+      requireAccess(payload.accessToken);
+      return {
+        ok: true,
+        secret: await vault.put(payload.name, payload.secret, {
+          purpose: payload.purpose,
+        }),
+      };
+    },
+    async vaultRemove(payload = {}) {
+      requireNotLatched();
+      requireAccess(payload.accessToken);
+      if (payload.confirmation !== "CONFIRM")
+        throw new Error('Type "CONFIRM" to remove a stored credential.');
+      return { ok: true, ...(await vault.remove(payload.name)) };
+    },
+    decideApproval(approvalId, { decision, accessToken } = {}) {
+      return sentinel.decideApproval(approvalId, {
+        decision,
+        via: "desktop",
+        authority: Boolean(activeAccess(accessToken)),
+      });
+    },
+    remoteDecideApproval(remoteToken, approvalId, decision) {
+      const remote = activeRemote(remoteToken);
+      if (!remote)
+        throw new Error(
+          "A live paired remote is required to decide approvals.",
+        );
+      return sentinel.decideApproval(approvalId, {
+        decision,
+        via: "mobile-remote",
+        authority: Boolean(liveAccessByHash(remote.accessTokenHash)),
+      });
+    },
+    remoteSentinelStatus(remoteToken) {
+      if (!activeRemote(remoteToken))
+        throw new Error("A live paired remote is required.");
+      return this.sentinelStatus();
+    },
+    async sentinelStatus() {
+      // Discovery is read-only and platform-gated; if it is unavailable here
+      // the dashboard says so instead of guessing.
+      let discovered = [];
+      try {
+        const scan = await monitorAgentRuntimes();
+        discovered = scan.result?.agents ?? [];
+      } catch {
+        discovered = [];
+      }
+      return { ok: true, ...sentinel.status({ discovered }), discovered };
+    },
     closeLedger() {
+      memory.close();
+      vault.close();
+      sentinel.close();
       ledger.close();
       state.close();
     },

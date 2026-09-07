@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { createDesktopToolService } from "../server/desktop-tools.mjs";
 import { capabilityCatalog } from "../server/ovia-core.mjs";
+import { staticAllowed } from "../server/standalone.mjs";
 
 async function fixture(name) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), `raimosa-${name}-`));
@@ -95,5 +96,37 @@ test("every new capability is registered with a named adapter", () => {
     assert.equal(entry.status, "available");
     assert.equal(entry.risk, "read-only");
     assert.ok(entry.adapter);
+  }
+});
+
+// ---------- Static interface exposure ----------
+
+test("the interface is served to this machine only, except the page a paired phone needs", () => {
+  const lan = "192.168.1.44";
+  const wan = "203.0.113.9";
+
+  // The desktop console itself must never answer another device. It used to:
+  // the adapter API was gated but the pages were not, so anyone on a shared
+  // network who found the port got the whole interface.
+  for (const route of ["/", "/ledger", "/sentinel", "/index.html"]) {
+    assert.equal(staticAllowed(route, "127.0.0.1"), true, `loopback ${route}`);
+    assert.equal(staticAllowed(route, lan), false, `LAN must not get ${route}`);
+  }
+
+  // Mobile pairing hands the phone http://<lan-ip>:<port>/remote, and that
+  // page loads the hashed bundle. Both must still work or pairing breaks.
+  for (const route of [
+    "/remote",
+    "/remote/",
+    "/assets/index-BVjTFbfW.js",
+    "/assets/index-CJ-V4j0a.css",
+    "/favicon.ico",
+  ]) {
+    assert.equal(staticAllowed(route, lan), true, `phone needs ${route}`);
+  }
+
+  // Nothing off the local network, ever — not even the remote page.
+  for (const route of ["/", "/remote", "/assets/index-BVjTFbfW.js"]) {
+    assert.equal(staticAllowed(route, wan), false, `off-LAN ${route}`);
   }
 });
