@@ -24,6 +24,23 @@ import {
 } from "./licensing.mjs";
 
 const execFileAsync = promisify(execFile);
+
+// Some adapters are dispatch-only: they hand a request to the operating system
+// and cannot observe what it does, which is why their receipts say
+// `verified: false`. They also genuinely reach the desktop — opening windows,
+// posting notifications, quitting apps, sleeping the machine. A test run must
+// never do that. Running `npm test` on this Mac opened a TextEdit window and
+// fired a real notification every time, because two suites exercise those
+// authorisation paths for real. Nothing any test asserts depends on the process
+// actually launching, so under `node --test` the request is skipped and the
+// adapter name is returned unchanged. Observations (df, pmset -g batt, ps,
+// pbpaste) are NOT routed through here: reading the machine is not a side
+// effect, and stubbing it would make the tests lie.
+const IN_TEST_RUN = Boolean(process.env.NODE_TEST_CONTEXT);
+const dispatchExec = (...args) =>
+  IN_TEST_RUN
+    ? Promise.resolve({ stdout: "", stderr: "" })
+    : execFileAsync(...args);
 const TEXT_EXTENSIONS = new Set([
   ".txt",
   ".md",
@@ -816,13 +833,13 @@ async function systemPower(payload) {
 
   if (process.platform === "darwin") {
     if (action === "sleep")
-      await execFileAsync("/usr/bin/pmset", ["sleepnow"], { timeout: 10_000 });
+      await dispatchExec("/usr/bin/pmset", ["sleepnow"], { timeout: 10_000 });
     else if (action === "display-sleep")
-      await execFileAsync("/usr/bin/pmset", ["displaysleepnow"], {
+      await dispatchExec("/usr/bin/pmset", ["displaysleepnow"], {
         timeout: 10_000,
       });
     else
-      await execFileAsync(
+      await dispatchExec(
         "/usr/bin/osascript",
         ["-e", `tell application "System Events" to ${action}`],
         { timeout: 15_000 },
@@ -838,7 +855,7 @@ async function systemPower(payload) {
       throw new Error(
         `${action} has no verified adapter on Windows. Use restart or shutdown.`,
       );
-    await execFileAsync("shutdown.exe", args, {
+    await dispatchExec("shutdown.exe", args, {
       timeout: 15_000,
       windowsHide: true,
     });
@@ -855,7 +872,7 @@ async function systemPower(payload) {
       throw new Error(
         `${action} has no verified adapter on ${process.platform}.`,
       );
-    await execFileAsync("systemctl", args, { timeout: 15_000 });
+    await dispatchExec("systemctl", args, { timeout: 15_000 });
   }
 
   return dispatchReceipt("system-power", "this device", {
@@ -1028,16 +1045,19 @@ async function validateApplication(appPath) {
 // Every platform opens a discovered target with its own OS opener, and the
 // target is always a validated path from the discovery list — never free text.
 async function openWithSystemOpener(target) {
+  // The adapter name lands in a receipt, so it says when nothing was launched
+  // rather than implying a window that does not exist.
+  const suffix = IN_TEST_RUN ? "-suppressed-in-test" : "";
   if (process.platform === "darwin") {
-    await execFileAsync("/usr/bin/open", ["-g", target], { timeout: 10_000 });
-    return "macos-open";
+    await dispatchExec("/usr/bin/open", ["-g", target], { timeout: 10_000 });
+    return `macos-open${suffix}`;
   }
   if (process.platform === "linux") {
-    await execFileAsync("xdg-open", [target], { timeout: 10_000 });
-    return "linux-xdg-open";
+    await dispatchExec("xdg-open", [target], { timeout: 10_000 });
+    return `linux-xdg-open${suffix}`;
   }
   if (process.platform === "win32") {
-    await execFileAsync(
+    await dispatchExec(
       "powershell.exe",
       [
         "-NoProfile",
@@ -1048,7 +1068,7 @@ async function openWithSystemOpener(target) {
       ],
       { timeout: 15_000, windowsHide: true },
     );
-    return "windows-start-process";
+    return `windows-start-process${suffix}`;
   }
   throw new Error(`Opening is not implemented for ${process.platform}.`);
 }
@@ -1067,14 +1087,14 @@ async function closeApplication(payload) {
   const app = await validateApplication(payload.appPath);
   if (process.platform === "darwin") {
     const script = `tell application "${escapeAppleScript(app.name)}" to quit`;
-    await execFileAsync("/usr/bin/osascript", ["-e", script], {
+    await dispatchExec("/usr/bin/osascript", ["-e", script], {
       timeout: 10_000,
     });
   } else if (process.platform === "win32") {
     // A Start Menu shortcut name is not necessarily the process name, so the
     // result must report how many windows were actually asked to close.
     // Claiming success when nothing matched would be a false receipt.
-    const { stdout } = await execFileAsync(
+    const { stdout } = await dispatchExec(
       "powershell.exe",
       [
         "-NoProfile",
@@ -1248,18 +1268,18 @@ async function localNotification(payload) {
   if (process.platform === "darwin") {
     const title = escapeAppleScript(rawTitle);
     const message = escapeAppleScript(rawMessage);
-    await execFileAsync(
+    await dispatchExec(
       "/usr/bin/osascript",
       ["-e", `display notification "${message}" with title "${title}"`],
       { timeout: 10_000 },
     );
   } else if (process.platform === "linux") {
     // Arguments are passed as argv, never interpolated into a shell string.
-    await execFileAsync("notify-send", [rawTitle, rawMessage], {
+    await dispatchExec("notify-send", [rawTitle, rawMessage], {
       timeout: 10_000,
     });
   } else if (process.platform === "win32") {
-    await execFileAsync(
+    await dispatchExec(
       "powershell.exe",
       [
         "-NoProfile",

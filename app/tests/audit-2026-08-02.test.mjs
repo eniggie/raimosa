@@ -121,6 +121,11 @@ test("a paired remote can still run control tools under live All Access", async 
       { remoteToken: remote.session.token },
     );
     assert.equal(result.result.state, "open-request-accepted");
+    // Running the suite must not open a window on the machine running it.
+    // This test used to launch TextEdit on a file containing "hello" every
+    // time `npm test` ran. The authorisation path is what is under test; the
+    // launch itself is suppressed and the receipt says so.
+    assert.match(result.result.adapter, /suppressed-in-test$/);
   }
 
   // After access ends, the same remote control call must fail.

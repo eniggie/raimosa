@@ -372,8 +372,8 @@ test("the /events stream pushes new receipts to a loopback client", async () => 
       return text.includes(until);
     };
     assert.ok(
-      await read("event: hello", 3000),
-      "the stream greets with the current count",
+      await read("event: connected", 3000),
+      "the stream announces it is connected and where the count starts",
     );
     // Cause a receipt and expect it to arrive without polling.
     await fetch(`http://127.0.0.1:${PORT}/api/raimosa/tools/find-files`, {

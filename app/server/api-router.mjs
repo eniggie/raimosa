@@ -135,8 +135,10 @@ export function createApiHandler({ getPort, service: injected } = {}) {
           Connection: "keep-alive",
         });
         let lastCount = service.ledgerCount();
+        // Name the greeting for what it is: the stream is open and this is the
+        // receipt count it starts from. "hello" told the reader nothing.
         res.write(
-          `event: hello\ndata: ${JSON.stringify({ count: lastCount })}\n\n`,
+          `event: connected\ndata: ${JSON.stringify({ receiptCount: lastCount })}\n\n`,
         );
         const tick = setInterval(() => {
           try {
