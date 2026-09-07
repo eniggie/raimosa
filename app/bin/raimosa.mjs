@@ -11,7 +11,10 @@ const root = path.resolve(here, "..");
 const MIN_NODE_MAJOR = 22; // node:sqlite ships built in from Node 22.
 
 function parseArgs(argv) {
-  const args = { port: process.env.RAIMOSA_PORT ?? 4173, open: true };
+  // PORT is the convention every host and dev harness sets. Honouring only RAIMOSA_PORT meant an
+  // assigned port was silently discarded and the server always came back up on 4173 — so two sessions
+  // could never run it side by side. RAIMOSA_PORT still wins, for anyone relying on it.
+  const args = { port: process.env.RAIMOSA_PORT ?? process.env.PORT ?? 4173, open: true };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--port" || arg === "-p") args.port = argv[++i];
