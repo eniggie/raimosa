@@ -13,8 +13,13 @@ import { createPublicKey, verify as edVerify } from "node:crypto";
 //   RAIMOSA-<base64url(payload)>.<base64url(signature)>
 // where payload is JSON: { p:"raimosa", t:"pro", h:<holder>, i:<ISO date>, v:1 }
 
+// Rotated 2026-09-25. The previous signing key was exposed in a session
+// transcript, so the pair was replaced while the store had never made a real
+// sale and the only licence in existence was the founder's. The retired pair
+// is kept at ~/.raimosa-keys/retired-20260925/ so an older key can still be
+// explained, but nothing signed by it verifies here any more.
 const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAETpOfdh35vLCJK9C5oJJ+1oCX/Emb9WhnpAzwbjGEDc=
+MCowBQYDK2VwAyEAWlJvkP/Ql3c0x+leRucslenx2rq+W8tlf5JQAlMlodI=
 -----END PUBLIC KEY-----`;
 
 const PUBLIC_KEY = createPublicKey(PUBLIC_KEY_PEM);
