@@ -1,5 +1,10 @@
 import http from "node:http";
-import { createReadStream, promises as fs } from "node:fs";
+import {
+  createReadStream,
+  promises as fs,
+  readFileSync,
+  unlinkSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -7,6 +12,7 @@ import {
   isLoopback,
   isLocalNetwork,
 } from "./api-router.mjs";
+import { raimosaHome } from "./desktop-tools.mjs";
 
 // The installed RAIMOSA runtime: serves the built interface and the adapter
 // API from one local Node process, with no build tooling present.
@@ -102,6 +108,50 @@ async function firstFreePort(preferred, host) {
   );
 }
 
+/**
+ * Where a running instance publishes the port it actually bound. Lives beside
+ * the ledger in RAIMOSA_HOME, which is already user-only state, so this adds no
+ * new surface: it names a loopback port that is open anyway.
+ */
+export function runtimeFilePath() {
+  return path.join(raimosaHome(), "runtime.json");
+}
+
+async function writeRuntimeFile(port) {
+  const file = runtimeFilePath();
+  const mine = JSON.stringify({
+    port,
+    pid: process.pid,
+    url: `http://127.0.0.1:${port}`,
+    startedAt: new Date().toISOString(),
+  });
+  try {
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, `${mine}\n`, { mode: 0o600 });
+  } catch {
+    // A read-only home is reported by the health scan, not thrown at boot.
+    return;
+  }
+  // Remove it on the way out, but only while it is still ours. A second
+  // instance overwrites the file, and deleting that on our exit would strand
+  // the one still running.
+  const clean = () => {
+    try {
+      const held = JSON.parse(readFileSync(file, "utf8"));
+      if (held.pid === process.pid) unlinkSync(file);
+    } catch {
+      // Already gone, replaced, or unreadable: nothing to take back.
+    }
+  };
+  process.once("exit", clean);
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    process.once(signal, () => {
+      clean();
+      process.exit(0);
+    });
+  }
+}
+
 export async function startRaimosa({
   port: requestedPort = 4173,
   host = "0.0.0.0",
@@ -133,6 +183,14 @@ export async function startRaimosa({
     server.once("error", reject);
     server.listen(port, host, resolve);
   });
+
+  // Advertise where we actually ended up. The macOS shell launches the runtime
+  // on a random port (RAIMOSA.swift picks 4200-4899), and firstFreePort moves
+  // us again if that one is taken, so nothing else can guess the port. The MCP
+  // bridge used to assume 4173, which meant Sentinel-over-MCP could never reach
+  // the installed app: every agent silently lost its supervisor. The file is
+  // written after listen() so it only ever names a port that is actually open.
+  await writeRuntimeFile(port);
 
   return { server, port, url: `http://localhost:${port}` };
 }

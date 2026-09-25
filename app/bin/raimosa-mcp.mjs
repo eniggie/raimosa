@@ -37,10 +37,48 @@ const VERSION = (() => {
     return "0.0.0";
   }
 })();
-const BASE = (process.env.RAIMOSA_URL || "http://127.0.0.1:4173").replace(
-  /\/$/,
-  "",
-);
+// Find the running adapter. RAIMOSA_URL still wins, for anyone pointing this at
+// a specific instance. Otherwise read the port the runtime published when it
+// bound, because it is not knowable otherwise: the macOS shell launches the
+// server on a random port in 4200-4899, and firstFreePort moves it again if
+// that one is busy. Assuming 4173 meant this bridge could never reach the
+// installed app, so every agent that tried to report to Sentinel got
+// "fetch failed" and carried on unsupervised. Falls back to 4173 for a plain
+// `raimosa` on the default port.
+function resolveBase() {
+  const explicit = process.env.RAIMOSA_URL;
+  if (explicit) return explicit;
+  // Same order raimosaHome() resolves in, so this finds the instance whichever
+  // way it was started: RAIMOSA_HOME wins, then a source checkout keeps its
+  // state in local-workspace/.raimosa, otherwise it is ~/.raimosa.
+  const candidates = [];
+  if (process.env.RAIMOSA_HOME) candidates.push(process.env.RAIMOSA_HOME);
+  const checkout = path.resolve(here, "..", "local-workspace");
+  try {
+    readFileSync(path.join(checkout, "README.md"), "utf8");
+    candidates.push(path.join(checkout, ".raimosa"));
+  } catch {
+    // Not a source checkout.
+  }
+  if (process.env.HOME)
+    candidates.push(path.join(process.env.HOME, ".raimosa"));
+
+  for (const home of candidates) {
+    try {
+      const held = JSON.parse(
+        readFileSync(path.join(home, "runtime.json"), "utf8"),
+      );
+      if (held && Number.isInteger(held.port) && held.port > 0) {
+        return held.url || `http://127.0.0.1:${held.port}`;
+      }
+    } catch {
+      // This one has not advertised itself; try the next.
+    }
+  }
+  return "http://127.0.0.1:4173";
+}
+
+const BASE = resolveBase().replace(/\/$/, "");
 const PROTOCOL_VERSION = "2024-11-05";
 
 async function api(route, body = {}) {

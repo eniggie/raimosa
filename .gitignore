@@ -2,6 +2,12 @@ node_modules/
 dist/
 .npm-cache/
 .DS_Store
+# macOS AppleDouble stubs. This repo lives on the exFAT Lexar volume, which
+# cannot store resource forks, so macOS writes a ._<name> sidecar next to every
+# file it copies. 406 of them showed up as untracked here, and 122 landed inside
+# .git/ where one shadowed the pack index and broke every git command with
+# 'non-monotonic index'. Set COPYFILE_DISABLE=1 to stop them being created.
+._*
 app/local-workspace/.raimosa/
 *.tgz
 dist-release/

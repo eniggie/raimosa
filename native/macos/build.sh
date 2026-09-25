@@ -8,6 +8,14 @@
 
 set -euo pipefail
 
+# This checkout can live on the exFAT Lexar volume, which has no resource forks,
+# so macOS writes a ._<name> sidecar beside every file that `cp -R` touches. The
+# steps below copy app/dist, app/bin and app/server into the bundle with cp -R,
+# so without this those stubs end up inside a signed, notarized .app. Setting it
+# here rather than relying on the shell means the build is correct however it is
+# invoked (npm runs scripts under sh, which never reads ~/.zshenv).
+export COPYFILE_DISABLE=1
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="$ROOT/native/macos/build"
 APP="$OUT/RAIMOSA.app"
@@ -117,6 +125,16 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+# 7b. Belt and braces: COPYFILE_DISABLE stops new sidecars, but a stale one
+#     already sitting in app/dist from an earlier build would still be copied
+#     in by step 4. Signing seals whatever is in the bundle, so strip them here
+#     rather than shipping 4KB of AppleDouble junk inside a notarized app.
+stubs="$(find "$APP" -name '._*' -type f | wc -l | tr -d ' ')"
+if [ "$stubs" -gt 0 ]; then
+  find "$APP" -name '._*' -type f -delete
+  say "Stripped $stubs AppleDouble stub(s) before signing."
+fi
 
 # 8. Sign. With a Developer ID identity present, sign properly with the
 #    hardened runtime (required for notarization); otherwise fall back to
